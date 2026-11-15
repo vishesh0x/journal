@@ -1,0 +1,43 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "journal",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Serves the built Vite SPA (dist/) for any request the Worker doesn't
+  // explicitly handle (static files first, SPA fallback to index.html).
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "journal_db",
+      "database_id": "5154a1ba-f9dc-44cf-a7c1-263077e1f227",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "journal-media"
+    }
+  ],
+
+  "vars": {
+    // Leave this empty to serve uploaded images through the Worker at
+    // /api/media/:key (works out of the box, no extra setup). Only set
+    // this once you've actually connected a custom domain to your R2
+    // bucket (Cloudflare dashboard -> R2 -> your bucket -> Settings ->
+    // Custom Domains) — setting it to any other value, including a domain
+    // that isn't really connected to the bucket, will break every
+    // uploaded image, since the app will point at that domain as-is.
+    "PUBLIC_MEDIA_BASE_URL": ""
+  }
+}
