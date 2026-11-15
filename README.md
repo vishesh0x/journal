@@ -408,3 +408,7 @@ The frontend was rebuilt with Hallmark (custom run) from the PencilBooth, Fold a
 - The CSP allows scripts from this site only. If you paste an analytics snippet in Settings, the policy relaxes to allow it. Cloudflare Web Analytics is allowed by default.
 - Known trade-off: PBKDF2 is capped at 100,000 iterations by the Workers runtime.
 - `/llms.txt` is generated from your posts and pages. Unknown files and `/.well-known/` paths return a real 404.
+
+## Image library
+
+The dashboard has an **Images** page: upload several files at once, copy an address, or delete a file. Each file shows where it is used (posts, pages, settings), and deleting a file that is in use asks first. Every image field (cover, share image, logo, favicon, portrait, and the editor's insert-image button) opens a picker where you can choose an existing image or upload a new one. The upload keeps the original file name, shown in the library.

@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
-import { ImagePlus, Loader, RefreshCw, Trash2 } from "lucide-react";
-import { api } from "@/lib/api";
+import { useState } from "react";
+import { Images, Loader, RefreshCw, Trash2 } from "lucide-react";
+import { MediaPicker, useUploadMedia } from "@/components/media-picker";
 
 export function UploadField({
   label,
@@ -15,27 +15,24 @@ export function UploadField({
   hint?: string;
   preview?: "wide" | "square";
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const upload = useUploadMedia();
 
-  async function handleFile(file: File | undefined) {
+  async function dropFile(file: File | undefined) {
     if (!file) return;
-    setBusy(true);
     setError(null);
     try {
-      const res = await api.upload<{ url: string }>("/media/upload", file);
+      const res = await upload.mutateAsync(file);
       onChange(res.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");
-    } finally {
-      setBusy(false);
-      if (inputRef.current) inputRef.current.value = "";
     }
   }
 
   const shape = preview === "square" ? { aspectRatio: "1", maxWidth: "11rem", borderRadius: "var(--radius-pill)" } : { aspectRatio: "16 / 7", width: "100%" };
+  const busy = upload.isPending;
 
   return (
     <div>
@@ -51,16 +48,16 @@ export function UploadField({
         onDrop={(e) => {
           e.preventDefault();
           setDragging(false);
-          void handleFile(e.dataTransfer.files?.[0]);
+          void dropFile(e.dataTransfer.files?.[0]);
         }}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => setOpen(true)}
         role="button"
         tabIndex={0}
-        aria-label={value ? `Replace ${label}` : `Upload ${label}`}
+        aria-label={value ? `Change ${label}` : `Choose ${label}`}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            inputRef.current?.click();
+            setOpen(true);
           }
         }}
       >
@@ -70,17 +67,17 @@ export function UploadField({
             <div className="veil">
               <span className="inline-flex items-center gap-2">
                 {busy ? <Loader size={18} aria-hidden="true" /> : <RefreshCw size={18} aria-hidden="true" />}
-                {busy ? "Uploading" : "Replace"}
+                {busy ? "Uploading" : "Change"}
               </span>
             </div>
           </>
         ) : (
           <div className="px-4 py-6 text-center">
             <span className="inline-flex items-center gap-2 font-bold">
-              {busy ? <Loader size={20} aria-hidden="true" /> : <ImagePlus size={20} aria-hidden="true" />}
-              {busy ? "Uploading" : "Add an image"}
+              {busy ? <Loader size={20} aria-hidden="true" /> : <Images size={20} aria-hidden="true" />}
+              {busy ? "Uploading" : "Choose or upload"}
             </span>
-            <p className="small mt-1">Drop a file or click. JPEG, PNG, WebP, GIF, AVIF or SVG.</p>
+            <p className="small mt-1">Pick one you already have, or drop a new file here.</p>
           </div>
         )}
       </div>
@@ -91,7 +88,11 @@ export function UploadField({
             <Trash2 size={14} aria-hidden="true" /> Remove
           </button>
         ) : null}
-        {hint ? <p className="form-hint" style={{ marginTop: 0 }}>{hint}</p> : null}
+        {hint ? (
+          <p className="form-hint" style={{ marginTop: 0 }}>
+            {hint}
+          </p>
+        ) : null}
       </div>
       {error ? (
         <p role="alert" className="notice mt-2">
@@ -99,13 +100,7 @@ export function UploadField({
         </p>
       ) : null}
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/svg+xml"
-        onChange={(e) => void handleFile(e.target.files?.[0])}
-        className="hidden"
-      />
+      <MediaPicker open={open} onClose={() => setOpen(false)} onPick={({ url }) => onChange(url)} title={`Choose ${label.toLowerCase()}`} />
     </div>
   );
 }

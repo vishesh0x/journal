@@ -10,6 +10,7 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { Field, Icon, Section, StatusChip, TextArea, Toggle } from "@/components/dash";
 import { MarkdownContent } from "@/components/markdown-content";
 import { UploadField } from "@/components/upload-field";
+import { MediaPicker } from "@/components/media-picker";
 import { optimizedImageUrl } from "@/lib/image";
 import { api, type Tag } from "@/lib/api";
 
@@ -74,6 +75,7 @@ export default function PostEditor() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [inserting, setInserting] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [dropping, setDropping] = useState(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const saved = useRef<string>("");
@@ -328,19 +330,15 @@ export default function PostEditor() {
                     <Icon as={action.icon} />
                   </button>
                 ))}
-                <label className="tool-btn ml-auto" title="Insert image" style={{ cursor: "pointer" }}>
+                <button
+                  type="button"
+                  className="tool-btn ml-auto"
+                  title="Insert image"
+                  aria-label="Insert image"
+                  onClick={() => setPickerOpen(true)}
+                >
                   <Icon as={inserting ? Loader : ImagePlus} />
-                  <span className="visually-hidden">Insert image</span>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/svg+xml"
-                    className="hidden"
-                    onChange={(e) => {
-                      void insertImageFile(e.target.files?.[0]);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
+                </button>
               </div>
 
               <div
@@ -390,7 +388,7 @@ export default function PostEditor() {
                     <h1 className="display-s" style={{ fontSize: "var(--text-section)", overflowWrap: "anywhere" }}>
                       {form.title || "Untitled post"}
                     </h1>
-                    {form.subtitle ? <p className="lead mt-4">{form.subtitle}</p> : null}
+                    {form.subtitle ? <p className="lead mt-4" style={{ color: "var(--color-ink)" }}>{form.subtitle}</p> : null}
                     <div className="meta mt-4">
                       <span>
                         <Icon as={CalendarDays} size={15} />
@@ -506,6 +504,12 @@ export default function PostEditor() {
           </div>
         )}
       </div>
+      <MediaPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title="Insert an image"
+        onPick={({ url, name }) => insertAtCursor(`\n![${filenameToAlt(name)}](${url})\n`, "", true)}
+      />
     </DashboardShell>
   );
 }

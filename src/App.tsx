@@ -26,6 +26,7 @@ const PagesList = lazy(() => import("@/pages/dashboard/PagesList"));
 const PageEditor = lazy(() => import("@/pages/dashboard/PageEditor"));
 const Subscribers = lazy(() => import("@/pages/dashboard/Subscribers"));
 const Settings = lazy(() => import("@/pages/dashboard/Settings"));
+const Media = lazy(() => import("@/pages/dashboard/Media"));
 
 function RequireAdmin({ children }: { children: ReactNode }) {
   const { loading, isAuthenticated, isAdmin } = useAuth();
@@ -103,6 +104,15 @@ export default function App() {
         element={
           <RequireAdmin>
             <Settings />
+          </RequireAdmin>
+        }
+      />
+
+      <Route
+        path="/dashboard/media"
+        element={
+          <RequireAdmin>
+            <Media />
           </RequireAdmin>
         }
       />

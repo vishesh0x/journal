@@ -81,9 +81,17 @@ export default function PostDetail() {
     <SiteShell>
       <article className="container">
         <header className="row-2 hero-row" style={{ paddingBottom: "var(--space-xl)" }}>
-          <h1 className="display-s">{post.title}</h1>
-          <div className="flex flex-col gap-5">
-            {post.subtitle ? <p className="lead">{post.subtitle}</p> : null}
+          <div className="flex min-w-0 flex-col gap-6">
+            <h1 className="display-s" style={{ overflowWrap: "anywhere" }}>
+              {post.title}
+            </h1>
+            {post.subtitle ? (
+              <p className="lead" style={{ maxWidth: "52ch", color: "var(--color-ink)" }}>
+                {post.subtitle}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex flex-col gap-4">
             <p className="meta small">
               <span>
                 <CalendarDays size={15} aria-hidden="true" />

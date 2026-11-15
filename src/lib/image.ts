@@ -25,12 +25,12 @@ export function optimizedImageUrl(
   if (!url.startsWith("/")) return url;
   if (/\.svg($|\?)/i.test(url)) return url;
 
-  const { width = 1600, quality = 72 } = options;
+  const { width = 1600, quality = 65 } = options;
   const params = [`width=${width}`, `quality=${quality}`, "format=auto"].join(",");
   return `/cdn-cgi/image/${params}${url}`;
 }
 
-export const COVER_WIDTHS = [480, 768, 1200, 1600];
+export const COVER_WIDTHS = [320, 480, 640, 768, 1024, 1280, 1600];
 
 /** A responsive srcset for resized images; undefined when the image can't be resized. Keep in sync with worker/lib/image.ts. */
 export function imageSrcSet(url: string | null | undefined, enabled?: boolean | number): string | undefined {

@@ -4,11 +4,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "./theme-toggle";
-import { ExternalLink, FileText, LogOut, PenLine, Settings as Cog, Tag, Users, type LucideIcon } from "lucide-react";
+import { ExternalLink, FileText, Images, LogOut, PenLine, Settings as Cog, Tag, Users, type LucideIcon } from "lucide-react";
 
 const NAV: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: "/dashboard", label: "Posts", icon: PenLine, end: true },
   { to: "/dashboard/pages", label: "Pages", icon: FileText },
+  { to: "/dashboard/media", label: "Images", icon: Images },
   { to: "/dashboard/tags", label: "Topics", icon: Tag },
   { to: "/dashboard/subscribers", label: "Subscribers", icon: Users },
   { to: "/dashboard/settings", label: "Settings", icon: Cog },

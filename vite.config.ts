@@ -20,7 +20,7 @@ function inlineCss(): Plugin {
         const link = new RegExp(`<link[^>]*href="[^"]*${name.split("/").pop()!.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*>`);
         if (link.test(source)) {
           source = source.replace(link, () => `<style>${String(file.source).replace(/<\/style/gi, "<\\/style")}</style>`);
-          delete bundle[name];
+          // The file stays in the bundle: lazy route chunks list it as a preload dependency.
         }
       }
       html.source = source;

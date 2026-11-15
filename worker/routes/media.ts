@@ -51,11 +51,53 @@ app.post("/upload", requireAdmin, async (c) => {
 
   // Random key and an extension taken from the sniffed type, never from the uploaded name.
   const key = `${crypto.randomUUID()}.${detected.ext}`;
-  await c.env.MEDIA.put(key, payload, { httpMetadata: { contentType: detected.type } });
+  const name = file.name.replace(/[\u0000-\u001f]/g, "").slice(0, 120);
+  await c.env.MEDIA.put(key, payload, { httpMetadata: { contentType: detected.type }, customMetadata: { name } });
 
   const base = c.env.PUBLIC_MEDIA_BASE_URL;
   const url = base ? `${base.replace(/\/$/, "")}/${key}` : `/api/media/${key}`;
   return c.json({ url, key });
+});
+
+type Source = { label: string; text: string };
+
+// Admin-only library listing: newest first, with where each file is used so deleting is an informed choice.
+app.get("/admin/list", requireAdmin, async (c) => {
+  const offset = Math.max(0, Number(c.req.query("offset") ?? 0) || 0);
+  const limit = Math.min(96, Math.max(1, Number(c.req.query("limit") ?? 48) || 48));
+
+  const all: R2Object[] = [];
+  let cursor: string | undefined;
+  for (let i = 0; i < 5; i++) {
+    const page = await c.env.MEDIA.list({ limit: 1000, cursor, include: ["customMetadata", "httpMetadata"] });
+    all.push(...page.objects);
+    if (!page.truncated) break;
+    cursor = page.cursor;
+  }
+  all.sort((a, b) => b.uploaded.getTime() - a.uploaded.getTime());
+  const slice = all.slice(offset, offset + limit);
+
+  const sources: Source[] = [];
+  const [posts, pages, settings] = await Promise.all([
+    c.env.DB.prepare("SELECT title, cover_url, og_image, content_md FROM posts").all<{ title: string; cover_url: string | null; og_image: string | null; content_md: string }>(),
+    c.env.DB.prepare("SELECT title, content_md FROM pages").all<{ title: string; content_md: string }>(),
+    c.env.DB.prepare("SELECT author_avatar_url, favicon_url, logo_url, default_og_image, about_markdown FROM site_settings WHERE id = 'main'").first<Record<string, string | null>>(),
+  ]);
+  for (const p of posts.results) sources.push({ label: `Post: ${p.title}`, text: `${p.cover_url ?? ""} ${p.og_image ?? ""} ${p.content_md}` });
+  for (const p of pages.results) sources.push({ label: `Page: ${p.title}`, text: p.content_md });
+  if (settings) sources.push({ label: "Site settings", text: Object.values(settings).join(" ") });
+
+  const base = c.env.PUBLIC_MEDIA_BASE_URL?.replace(/\/$/, "");
+  const items = slice.map((o) => ({
+    key: o.key,
+    url: base ? `${base}/${o.key}` : `/api/media/${o.key}`,
+    size: o.size,
+    uploaded: o.uploaded.toISOString(),
+    type: o.httpMetadata?.contentType ?? "",
+    name: o.customMetadata?.name || o.key,
+    usedIn: sources.filter((s) => s.text.includes(o.key)).map((s) => s.label).slice(0, 5),
+  }));
+  return c.json({ items, total: all.length, hasMore: offset + limit < all.length });
 });
 
 const KEY_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$/;

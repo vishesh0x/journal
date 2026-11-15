@@ -2,7 +2,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardShell } from "@/components/dashboard-shell";
-import { PageHead } from "@/components/dash";
+import { Field, PageHead, TextArea } from "@/components/dash";
 import { api, type Tag } from "@/lib/api";
 
 export default function TagsManager() {
@@ -40,33 +40,22 @@ export default function TagsManager() {
             e.preventDefault();
             if (name.trim()) add.mutate();
           }}
-          className="tile tone-a mb-8 flex flex-col gap-3 sm:flex-row"
+          className="section-card mb-8"
           style={{ borderRadius: "var(--radius-panel)" }}
         >
-          <label htmlFor="topic-name" className="visually-hidden">
-            Topic name
-          </label>
-          <input
-            id="topic-name"
-            value={name}
-            maxLength={80}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Topic name"
-            className="field sm:w-56"
-          />
-          <label htmlFor="topic-desc" className="visually-hidden">
-            Short description
-          </label>
-          <input
+          <Field id="topic-name" label="Topic name" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder="For example, Cities" />
+          <TextArea
             id="topic-desc"
+            label="Short description"
+            rows={4}
             value={description}
             maxLength={500}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Short description (optional)"
-            className="field flex-1"
+            placeholder="A sentence or two about what this topic covers. It appears at the top of the topic page."
+            hint={`${description.length} of 500 characters`}
           />
-          <button type="submit" className="btn" disabled={add.isPending}>
-            <Plus size={18} aria-hidden="true" /> Add
+          <button type="submit" className="btn self-start" disabled={add.isPending || !name.trim()}>
+            <Plus size={18} aria-hidden="true" /> Add topic
           </button>
         </form>
         {error ? (
