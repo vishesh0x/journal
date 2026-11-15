@@ -18,8 +18,9 @@ app.get("/admin", requireAdmin, async (c) => {
 
 app.post("/admin", requireAdmin, async (c) => {
   const body = await c.req.json<{ id?: string; name?: string; description?: string | null }>().catch(() => ({}) as any);
-  const { id, description } = body;
-  const name = (body.name ?? "").trim();
+  const { id } = body;
+  const description = typeof body.description === "string" ? body.description.slice(0, 500) : null;
+  const name = (typeof body.name === "string" ? body.name : "").trim().slice(0, 80);
   if (!name) return c.json({ error: "Give the topic a name." }, 400);
   const slug = slugify(name);
   if (id) {

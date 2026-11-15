@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { api } from "@/lib/api";
@@ -11,6 +11,15 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [setupToken, setSetupToken] = useState("");
+  const [needsSetupToken, setNeedsSetupToken] = useState(false);
+
+  useEffect(() => {
+    api
+      .get<{ needsSetupToken?: boolean }>("/auth/bootstrap-status")
+      .then((res) => setNeedsSetupToken(Boolean(res.needsSetupToken)))
+      .catch(() => setNeedsSetupToken(false));
+  }, []);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -18,7 +27,7 @@ export default function Auth() {
     setError(null);
     try {
       const endpoint = needsBootstrap ? "/auth/register" : "/auth/login";
-      await api.post(endpoint, { email, password });
+      await api.post(endpoint, needsBootstrap ? { email, password, setupToken } : { email, password });
       await refresh();
       navigate("/dashboard");
     } catch (err) {
@@ -94,6 +103,23 @@ export default function Auth() {
               placeholder="Password"
               className="field"
             />
+            {needsBootstrap && needsSetupToken ? (
+              <>
+                <label htmlFor="auth-setup" className="visually-hidden">
+                  Setup code
+                </label>
+                <input
+                  id="auth-setup"
+                  type="password"
+                  required
+                  autoComplete="off"
+                  value={setupToken}
+                  onChange={(e) => setSetupToken(e.target.value)}
+                  placeholder="Setup code"
+                  className="field"
+                />
+              </>
+            ) : null}
             <button type="submit" disabled={busy} className="btn w-full">
               {busy ? "Please wait…" : needsBootstrap ? "Create account" : "Sign in"}
             </button>

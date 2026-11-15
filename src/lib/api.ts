@@ -72,7 +72,6 @@ export type SiteSettings = {
   author_avatar_url?: string | null;
   favicon_url?: string | null;
   logo_url?: string | null;
-  accent: string;
   theme_mode: "system" | "light" | "dark";
   image_resizing_enabled: boolean | number;
   about_markdown: string;

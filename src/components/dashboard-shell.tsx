@@ -4,13 +4,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "./theme-toggle";
+import { ExternalLink, FileText, LogOut, PenLine, Settings as Cog, Tag, Users, type LucideIcon } from "lucide-react";
 
-const NAV = [
-  { to: "/dashboard", label: "Posts", end: true },
-  { to: "/dashboard/pages", label: "Pages" },
-  { to: "/dashboard/tags", label: "Topics" },
-  { to: "/dashboard/subscribers", label: "Subscribers" },
-  { to: "/dashboard/settings", label: "Settings" },
+const NAV: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
+  { to: "/dashboard", label: "Posts", icon: PenLine, end: true },
+  { to: "/dashboard/pages", label: "Pages", icon: FileText },
+  { to: "/dashboard/tags", label: "Topics", icon: Tag },
+  { to: "/dashboard/subscribers", label: "Subscribers", icon: Users },
+  { to: "/dashboard/settings", label: "Settings", icon: Cog },
 ];
 
 export function DashboardShell({ children }: { children: ReactNode }) {
@@ -38,19 +39,20 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </div>
 
           <nav aria-label="Dashboard" className="flex flex-wrap gap-1 lg:flex-col lg:flex-nowrap">
-            {NAV.map(({ to, label, end }) => (
-              <NavLink key={to} to={to} end={end} className="nav-link" style={{ textAlign: "left" }}>
+            {NAV.map(({ to, label, end, icon: Glyph }) => (
+              <NavLink key={to} to={to} end={end} className="nav-link nav-icon-link">
+                <Glyph size={18} strokeWidth={2.25} aria-hidden="true" />
                 {label}
               </NavLink>
             ))}
           </nav>
 
           <div className="mt-auto flex flex-col items-start gap-3">
-            <a href="/" target="_blank" rel="noreferrer" className="text-link">
-              View the site
+            <a href="/" target="_blank" rel="noreferrer" className="text-link inline-flex items-center gap-2">
+              <ExternalLink size={16} aria-hidden="true" /> View the site
             </a>
             <button type="button" onClick={signOut} className="btn-ghost">
-              Sign out
+              <LogOut size={18} aria-hidden="true" /> Sign out
             </button>
           </div>
         </div>

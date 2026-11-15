@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Moon, Sun } from "lucide-react";
 
 export function ThemeToggle({ defaultMode = "system" }: { defaultMode?: "system" | "light" | "dark" }) {
   const [dark, setDark] = useState(false);
@@ -22,8 +23,15 @@ export function ThemeToggle({ defaultMode = "system" }: { defaultMode?: "system"
   }
 
   return (
-    <button type="button" onClick={toggle} aria-pressed={dark} className="nav-btn">
-      {dark ? "Light" : "Dark"}
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={dark}
+      aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+      title={dark ? "Light theme" : "Dark theme"}
+      className="nav-btn nav-icon"
+    >
+      {dark ? <Sun size={18} strokeWidth={2.25} aria-hidden="true" /> : <Moon size={18} strokeWidth={2.25} aria-hidden="true" />}
     </button>
   );
 }

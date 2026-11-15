@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { ImagePlus, Loader, RefreshCw, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 
 export function UploadField({
@@ -34,13 +35,14 @@ export function UploadField({
     }
   }
 
-  const frame = preview === "square" ? "aspect-square max-w-[9rem] rounded-full" : "aspect-[16/7] w-full rounded-2xl";
+  const shape = preview === "square" ? { aspectRatio: "1", maxWidth: "11rem", borderRadius: "var(--radius-pill)" } : { aspectRatio: "16 / 7", width: "100%" };
 
   return (
     <div>
-      <p className="text-sm font-bold  text-muted-foreground">{label}</p>
-
+      <p className="form-label">{label}</p>
       <div
+        className={`drop ${dragging ? "is-over" : ""}`}
+        style={shape}
         onDragOver={(e) => {
           e.preventDefault();
           setDragging(true);
@@ -54,46 +56,53 @@ export function UploadField({
         onClick={() => inputRef.current?.click()}
         role="button"
         tabIndex={0}
+        aria-label={value ? `Replace ${label}` : `Upload ${label}`}
         onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") inputRef.current?.click();
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
         }}
-        className={`group relative mt-2 grid cursor-pointer place-items-center overflow-hidden border border-dashed bg-surface transition-colors ${frame} ${
-          dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary"
-        }`}
       >
         {value ? (
           <>
-            <img src={value} alt={`${label} preview`} className="absolute inset-0 size-full object-cover" />
-            <div className="absolute inset-0 grid place-items-center bg-foreground/70 text-xs font-bold  text-background opacity-0 transition-opacity group-hover:opacity-100">
-              {busy ? "Uploading…" : "Replace image"}
+            <img src={value} alt="" />
+            <div className="veil">
+              <span className="inline-flex items-center gap-2">
+                {busy ? <Loader size={18} aria-hidden="true" /> : <RefreshCw size={18} aria-hidden="true" />}
+                {busy ? "Uploading" : "Replace"}
+              </span>
             </div>
           </>
         ) : (
-          <div className="px-4 py-8 text-center">
-            <p className="text-sm font-semibold">{busy ? "Uploading…" : "Drop an image here"}</p>
-            <p className="mt-1 text-xs text-muted-foreground">or click to choose a file</p>
+          <div className="px-4 py-6 text-center">
+            <span className="inline-flex items-center gap-2 font-bold">
+              {busy ? <Loader size={20} aria-hidden="true" /> : <ImagePlus size={20} aria-hidden="true" />}
+              {busy ? "Uploading" : "Add an image"}
+            </span>
+            <p className="small mt-1">Drop a file or click. JPEG, PNG, WebP, GIF, AVIF or SVG.</p>
           </div>
         )}
       </div>
 
-      <div className="mt-2 flex items-center gap-4">
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
         {value ? (
-          <button
-            type="button"
-            onClick={() => onChange(null)}
-            className="text-xs font-semibold text-muted-foreground transition-colors hover:text-destructive"
-          >
-            Remove
+          <button type="button" onClick={() => onChange(null)} className="linkbtn danger inline-flex items-center gap-1">
+            <Trash2 size={14} aria-hidden="true" /> Remove
           </button>
         ) : null}
-        {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+        {hint ? <p className="form-hint" style={{ marginTop: 0 }}>{hint}</p> : null}
       </div>
-      {error ? <p className="mt-1.5 text-xs text-destructive">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="notice mt-2">
+          {error}
+        </p>
+      ) : null}
 
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/svg+xml"
         onChange={(e) => void handleFile(e.target.files?.[0])}
         className="hidden"
       />

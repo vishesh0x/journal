@@ -4,14 +4,16 @@ import { useAuth } from "@/lib/auth";
 import { PageSkeleton } from "@/components/skeletons";
 
 import Home from "@/pages/Home";
-import PostDetail from "@/pages/PostDetail";
-import Archive from "@/pages/Archive";
-import Search from "@/pages/Search";
-import TagDetail from "@/pages/TagDetail";
-import About from "@/pages/About";
-import CustomPage, { PrivacyPage, TermsPage } from "@/pages/StaticPage";
-import Auth from "@/pages/Auth";
-import Unsubscribe from "@/pages/Unsubscribe";
+const PostDetail = lazy(() => import("@/pages/PostDetail"));
+const Archive = lazy(() => import("@/pages/Archive"));
+const Search = lazy(() => import("@/pages/Search"));
+const TagDetail = lazy(() => import("@/pages/TagDetail"));
+const About = lazy(() => import("@/pages/About"));
+const CustomPage = lazy(() => import("@/pages/StaticPage"));
+const PrivacyPage = lazy(() => import("@/pages/StaticPage").then((m) => ({ default: m.PrivacyPage })));
+const TermsPage = lazy(() => import("@/pages/StaticPage").then((m) => ({ default: m.TermsPage })));
+const Auth = lazy(() => import("@/pages/Auth"));
+const Unsubscribe = lazy(() => import("@/pages/Unsubscribe"));
 import NotFound from "@/pages/NotFound";
 
 // Dashboard routes are only ever visited by the site owner, so they're
@@ -34,6 +36,7 @@ function RequireAdmin({ children }: { children: ReactNode }) {
 
 export default function App() {
   return (
+    <Suspense fallback={<PageSkeleton />}>
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/archive" element={<Archive />} />
@@ -106,5 +109,6 @@ export default function App() {
 
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </Suspense>
   );
 }

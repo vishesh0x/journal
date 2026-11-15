@@ -3,6 +3,7 @@ import type { AppEnv } from "../types";
 import { requireAdmin } from "../middleware/auth";
 import { newId, slugify } from "../lib/content";
 import { cacheControl } from "../middleware/cache";
+import { HttpError, cleanFields, readJson, type Rule } from "../lib/validate";
 
 const app = new Hono<AppEnv>();
 
@@ -51,26 +52,25 @@ app.post("/admin", requireAdmin, async (c) => {
   return c.json({ id });
 });
 
-const PATCHABLE_FIELDS = [
-  "title",
-  "slug",
-  "subtitle",
-  "eyebrow",
-  "content_md",
-  "status",
-  "show_in_footer",
-  "show_in_nav",
-  "sort_order",
-  "meta_title",
-  "meta_description",
-  "noindex",
-] as const;
+const RULES: Record<string, Rule> = {
+  title: "text",
+  slug: "text",
+  subtitle: "text",
+  eyebrow: "text",
+  content_md: "long",
+  status: "enum:draft,published",
+  show_in_footer: "bool",
+  show_in_nav: "bool",
+  sort_order: "int",
+  meta_title: "text",
+  meta_description: "text",
+  noindex: "bool",
+};
 
 app.put("/admin/:id", requireAdmin, async (c) => {
   const id = c.req.param("id");
-  const body = await c.req.json<Record<string, unknown>>();
-  const update: Record<string, unknown> = {};
-  for (const field of PATCHABLE_FIELDS) if (field in body) update[field] = body[field];
+  const body = await readJson<Record<string, unknown>>(c);
+  const update = cleanFields(body, RULES);
 
   if (typeof update.slug === "string") {
     const current = await c.env.DB.prepare("SELECT system_key FROM pages WHERE id = ?").bind(id).first<{
@@ -79,7 +79,7 @@ app.put("/admin/:id", requireAdmin, async (c) => {
     if (current?.system_key) {
       delete update.slug; // protected slugs (about/privacy/terms) can't be renamed
     } else {
-      update.slug = slugify((update.slug as string) || (body.title as string) || "page");
+      update.slug = slugify((update.slug as string) || (typeof body.title === "string" ? body.title : "") || "page");
       const clash = await c.env.DB.prepare("SELECT id FROM pages WHERE slug = ? AND id != ?")
         .bind(update.slug, id)
         .first();
@@ -98,6 +98,10 @@ app.put("/admin/:id", requireAdmin, async (c) => {
 });
 
 app.delete("/admin/:id", requireAdmin, async (c) => {
+  const row = await c.env.DB.prepare("SELECT system_key FROM pages WHERE id = ?").bind(c.req.param("id")).first<{
+    system_key: string | null;
+  }>();
+  if (row?.system_key) throw new HttpError(409, "Built-in pages can’t be deleted.");
   await c.env.DB.prepare("DELETE FROM pages WHERE id = ?").bind(c.req.param("id")).run();
   return c.json({ ok: true });
 });

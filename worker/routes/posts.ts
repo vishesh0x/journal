@@ -3,6 +3,7 @@ import type { AppEnv } from "../types";
 import { requireAdmin } from "../middleware/auth";
 import { newId, readingMinutes, makeExcerpt, slugify } from "../lib/content";
 import { cacheControl } from "../middleware/cache";
+import { HttpError, cleanFields, readJson, type Rule } from "../lib/validate";
 
 const app = new Hono<AppEnv>();
 
@@ -71,7 +72,7 @@ app.get("/", cacheControl(60), async (c) => {
 
   const { results: rows } = await c.env.DB.prepare(
     `SELECT ${SUMMARY_COLUMNS} FROM posts WHERE status = 'published' AND published_at <= ? ${filterSql}
-     ORDER BY published_at DESC LIMIT ? OFFSET ?`,
+     ORDER BY ${tagSlug ? "" : "featured DESC, "}published_at DESC LIMIT ? OFFSET ?`,
   )
     .bind(now, ...filterArgs, perPage, offset)
     .all<any>();
@@ -162,7 +163,7 @@ app.get("/admin/:id", requireAdmin, async (c) => {
 
 app.post("/admin", requireAdmin, async (c) => {
   const body = await c.req.json<{ title?: string }>().catch(() => ({}) as { title?: string });
-  const title = body.title?.trim() || "Untitled post";
+  const title = (typeof body.title === "string" ? body.title.trim().slice(0, 300) : "") || "Untitled post";
   let slug = slugify(title);
   const clash = await c.env.DB.prepare("SELECT id FROM posts WHERE slug = ?").bind(slug).first();
   if (clash) slug = `${slug}-${Date.now().toString(36).slice(-4)}`;
@@ -176,37 +177,39 @@ app.post("/admin", requireAdmin, async (c) => {
   return c.json({ id });
 });
 
-const PATCHABLE_FIELDS = [
-  "title",
-  "slug",
-  "subtitle",
-  "excerpt",
-  "content_md",
-  "cover_url",
-  "status",
-  "published_at",
-  "featured",
-  "meta_title",
-  "meta_description",
-  "og_image",
-  "canonical_url",
-  "noindex",
-] as const;
+const RULES: Record<string, Rule> = {
+  title: "text",
+  slug: "text",
+  subtitle: "text",
+  excerpt: "text",
+  content_md: "long",
+  cover_url: "url",
+  status: "enum:draft,published",
+  published_at: "date",
+  featured: "bool",
+  meta_title: "text",
+  meta_description: "text",
+  og_image: "url",
+  canonical_url: "url",
+  noindex: "bool",
+};
 
 app.put("/admin/:id", requireAdmin, async (c) => {
   const id = c.req.param("id");
-  const body = await c.req.json<Record<string, unknown> & { tagIds?: string[] }>();
-  const { tagIds, ...patch } = body;
-
-  const update: Record<string, unknown> = {};
-  for (const field of PATCHABLE_FIELDS) if (field in patch) update[field] = patch[field];
+  const body = await readJson<Record<string, unknown> & { tagIds?: unknown }>(c);
+  const { tagIds: rawTagIds, ...patch } = body;
+  const update = cleanFields(patch, RULES);
+  if (rawTagIds !== undefined && (!Array.isArray(rawTagIds) || rawTagIds.length > 50 || rawTagIds.some((t) => typeof t !== "string"))) {
+    throw new HttpError(400, "Topics must be a list of ids.");
+  }
+  const tagIds = rawTagIds as string[] | undefined;
 
   if (typeof update.content_md === "string") {
     update.reading_minutes = readingMinutes(update.content_md);
     if (!update.excerpt) update.excerpt = makeExcerpt(update.content_md);
   }
   if (typeof update.slug === "string") {
-    update.slug = slugify(update.slug || (patch.title as string) || "untitled");
+    update.slug = slugify(update.slug || (typeof patch.title === "string" ? patch.title : "") || "untitled");
     const clash = await c.env.DB.prepare("SELECT id FROM posts WHERE slug = ? AND id != ?")
       .bind(update.slug, id)
       .first();

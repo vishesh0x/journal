@@ -1,3 +1,4 @@
+import { CalendarDays, Clock } from "lucide-react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { SiteShell } from "@/components/site-shell";
@@ -6,7 +7,7 @@ import { MarkdownContent } from "@/components/markdown-content";
 import { PageSkeleton } from "@/components/skeletons";
 import { extractToc } from "@/lib/markdown";
 import { useDocumentMeta } from "@/lib/head";
-import { optimizedImageUrl } from "@/lib/image";
+import { imageSrcSet, optimizedImageUrl } from "@/lib/image";
 import { api, type PostFull, type PostSummary, type SiteSettings } from "@/lib/api";
 
 function formatDate(value: string | null) {
@@ -83,10 +84,15 @@ export default function PostDetail() {
           <h1 className="display-s">{post.title}</h1>
           <div className="flex flex-col gap-5">
             {post.subtitle ? <p className="lead">{post.subtitle}</p> : null}
-            <p className="small">
-              <time dateTime={post.published_at ?? undefined}>{formatDate(post.published_at)}</time>
-              <br />
-              {post.reading_minutes} min read
+            <p className="meta small">
+              <span>
+                <CalendarDays size={15} aria-hidden="true" />
+                <time dateTime={post.published_at ?? undefined}>{formatDate(post.published_at)}</time>
+              </span>
+              <span>
+                <Clock size={15} aria-hidden="true" />
+                {post.reading_minutes} min read
+              </span>
             </p>
             {post.tags.length ? (
               <div className="chips">
@@ -103,31 +109,36 @@ export default function PostDetail() {
         {post.cover_url ? (
           <img
             src={optimizedImageUrl(post.cover_url, { width: 1600 }, settings?.image_resizing_enabled) ?? undefined}
-            alt={post.title}
+            srcSet={imageSrcSet(post.cover_url, settings?.image_resizing_enabled)}
+            sizes="(min-width: 80rem) 1184px, 100vw"
+            width={1600}
+            height={900}
+            alt=""
             className="cover"
             fetchPriority="high"
+            decoding="async"
           />
         ) : null}
 
-        <div className="row-2 band-flush">
-          {toc.length > 2 ? (
-            <>
-              <details className="tile lg:hidden" style={{ padding: "var(--space-md)" }}>
-                <summary className="cursor-pointer font-bold">Contents</summary>
-                <div className="mt-4">{tocList}</div>
-              </details>
-              <aside className="sticky-head hidden lg:block" aria-label="Contents">
-                <h2 className="h-title mb-5">Contents</h2>
-                {tocList}
-              </aside>
-            </>
-          ) : (
-            <div className="hidden lg:block" />
-          )}
-          <div className="w-full min-w-0" style={{ maxWidth: "68ch" }}>
+        {toc.length > 2 ? (
+          <div className="row-2 band-flush">
+            <details className="tile lg:hidden" style={{ padding: "var(--space-md)" }}>
+              <summary className="cursor-pointer font-bold">Contents</summary>
+              <div className="mt-4">{tocList}</div>
+            </details>
+            <aside className="sticky-head hidden lg:block" aria-label="Contents">
+              <h2 className="h-title mb-5">Contents</h2>
+              {tocList}
+            </aside>
+            <div className="w-full min-w-0" style={{ maxWidth: "68ch" }}>
+              <MarkdownContent markdown={post.content_md} />
+            </div>
+          </div>
+        ) : (
+          <div className="band-flush single-col min-w-0">
             <MarkdownContent markdown={post.content_md} />
           </div>
-        </div>
+        )}
 
         <section className="band-flush tile tone-c row-2 wide-left" style={{ alignItems: "center", padding: "var(--space-xl)", marginTop: "var(--section-gap-s)" }}>
           <div className="flex items-center gap-5">

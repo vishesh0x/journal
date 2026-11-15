@@ -55,6 +55,14 @@
   --color-tile-e: oklch(36% 0.08 148);
   --color-tile-e-ink: oklch(96% 0.015 148);
 
+  /* code */
+  --code-keyword: oklch(40% 0.2 300);
+  --code-string: oklch(40% 0.12 150);
+  --code-number: oklch(43% 0.15 55);
+  --code-comment: oklch(45% 0.03 272);
+  --code-fn: oklch(40% 0.17 262);
+  --code-type: oklch(42% 0.14 20);
+
   --font-display: var(--font-body);
   --font-body: "Paper Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --font-outlier: var(--font-body);
@@ -124,6 +132,12 @@
   --color-focus: oklch(78% 0.13 262);
   --color-error: oklch(70% 0.16 27);
   --color-success: oklch(75% 0.12 150);
+  --code-keyword: oklch(80% 0.13 300);
+  --code-string: oklch(80% 0.13 150);
+  --code-number: oklch(82% 0.12 60);
+  --code-comment: oklch(72% 0.03 272);
+  --code-fn: oklch(80% 0.11 250);
+  --code-type: oklch(80% 0.11 20);
   --shadow-nav: none;
   --primary: var(--color-signal);
 }

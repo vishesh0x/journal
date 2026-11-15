@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { Link } from "react-router-dom";
+import { CalendarDays, Clock } from "lucide-react";
 import type { PostSummary } from "@/lib/api";
 
 function formatDate(value: string | null) {
@@ -26,10 +27,15 @@ function PostCardInner({ post }: { post: PostSummary }) {
           ))}
         </div>
       ) : null}
-      <div className="small mt-auto">
-        <time dateTime={post.published_at ?? undefined}>{formatDate(post.published_at)}</time>
-        <br />
-        {post.reading_minutes} min read
+      <div className="meta small mt-auto">
+        <span>
+          <CalendarDays size={15} aria-hidden="true" />
+          <time dateTime={post.published_at ?? undefined}>{formatDate(post.published_at)}</time>
+        </span>
+        <span>
+          <Clock size={15} aria-hidden="true" />
+          {post.reading_minutes} min read
+        </span>
       </div>
     </article>
   );

@@ -1,6 +1,8 @@
+import { ExternalLink, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { PageHead, StatusChip } from "@/components/dash";
 import { pagePath } from "@/components/site-shell";
 import { api } from "@/lib/api";
 
@@ -31,74 +33,55 @@ export default function PagesList() {
 
   return (
     <DashboardShell>
-      <div className="mx-auto w-full max-w-4xl px-5 py-8 sm:py-10">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="font-display text-2xl tracking-tight sm:text-3xl">Pages</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Privacy and Terms live here, and you can add any page you like.
-            </p>
-          </div>
-          <button
-            onClick={() => create.mutate()}
-            disabled={create.isPending}
-            className="btn"
-          >
-            {create.isPending ? "Creating…" : "New page"}
-          </button>
-        </div>
+      <div className="dash-main narrow">
+        <PageHead
+          title="Pages"
+          hint="Privacy and Terms live here, and you can add any page you like."
+          action={
+            <button type="button" onClick={() => create.mutate()} disabled={create.isPending} className="btn">
+              <Plus size={18} aria-hidden="true" /> {create.isPending ? "Creating…" : "New page"}
+            </button>
+          }
+        />
 
-        <div className="mt-8 overflow-hidden rounded-lg border border-border">
+        <div className="panel">
           {pages.isLoading ? (
-            <p className="p-6 text-sm text-muted-foreground">Loading pages…</p>
+            <p className="panel-empty">Loading pages…</p>
           ) : rows.length === 0 ? (
-            <p className="p-8 text-center text-sm text-muted-foreground">No pages yet.</p>
+            <p className="panel-empty">No pages yet.</p>
           ) : (
-            <ul className="divide-y divide-border">
-              {rows.map((page) => (
-                <li key={page.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
-                  <div className="min-w-0 flex-1">
-                    <button
-                      onClick={() => navigate(`/dashboard/pages/${page.id}`)}
-                      className="text-left font-display text-lg leading-snug hover:text-primary"
-                    >
-                      {page.title}
-                    </button>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {pagePath(page.slug)}
-                      {page.system_key ? ", built in" : ""}
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full border px-2.5 py-0.5 text-xs capitalize ${
-                      page.status === "published" ? "border-primary/40 text-primary" : "border-border text-muted-foreground"
-                    }`}
+            rows.map((page) => (
+              <div key={page.id} className="panel-row">
+                <div className="row-main">
+                  <button type="button" onClick={() => navigate(`/dashboard/pages/${page.id}`)} className="row-title">
+                    {page.title}
+                  </button>
+                  <p className="small mt-1">
+                    {pagePath(page.slug)}
+                    {page.system_key ? ", built in" : ""}
+                  </p>
+                </div>
+                <StatusChip on={page.status === "published"}>{page.status}</StatusChip>
+                {page.status === "published" ? (
+                  <a href={pagePath(page.slug)} target="_blank" rel="noreferrer" className="icon-btn" aria-label={`View ${page.title}`} title="View on the site">
+                    <ExternalLink size={18} aria-hidden="true" />
+                  </a>
+                ) : null}
+                {page.system_key ? null : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm(`Delete “${page.title}”?`)) remove.mutate(page.id);
+                    }}
+                    className="icon-btn danger"
+                    aria-label={`Delete ${page.title}`}
+                    title="Delete"
                   >
-                    {page.status}
-                  </span>
-                  {page.status === "published" ? (
-                    <a
-                      href={pagePath(page.slug)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      View
-                    </a>
-                  ) : null}
-                  {page.system_key ? null : (
-                    <button
-                      onClick={() => {
-                        if (confirm(`Delete "${page.title}"?`)) remove.mutate(page.id);
-                      }}
-                      className="text-xs text-muted-foreground transition-colors hover:text-destructive"
-                    >
-                      Delete
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
+                    <Trash2 size={18} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            ))
           )}
         </div>
       </div>

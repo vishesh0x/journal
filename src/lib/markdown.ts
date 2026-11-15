@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import remarkRehype from "remark-rehype";
 import rehypeSanitize from "rehype-sanitize";
 import rehypeSlug from "rehype-slug";
+import rehypeHighlight from "rehype-highlight";
 import rehypeStringify from "rehype-stringify";
 import GithubSlugger from "github-slugger";
 import type { Element, Root } from "hast";
@@ -31,6 +32,8 @@ const processor = unified()
   .use(remarkRehype)
   .use(rehypeSanitize)
   .use(rehypeLazyImages)
+  // Runs after sanitising, so the token classes it adds are kept. Mermaid source stays plain for the diagram renderer.
+  .use(rehypeHighlight, { detect: false, plainText: ["mermaid", "text", "plain"] })
   .use(rehypeSlug)
   .use(rehypeStringify);
 

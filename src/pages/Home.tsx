@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowRight, CalendarDays, Clock, Library } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { SiteShell } from "@/components/site-shell";
 import { PostCard } from "@/components/post-card";
@@ -7,7 +8,7 @@ import { Newsletter } from "@/components/newsletter";
 import { ErrorState } from "@/components/error-state";
 import { FeaturedPostSkeleton, PostListSkeleton } from "@/components/skeletons";
 import { useDocumentMeta } from "@/lib/head";
-import { optimizedImageUrl } from "@/lib/image";
+import { imageSrcSet, optimizedImageUrl } from "@/lib/image";
 import { api, type PostSummary, type SiteSettings } from "@/lib/api";
 
 function formatDate(value: string | null) {
@@ -76,11 +77,11 @@ export default function Home() {
             <div className="flex flex-wrap gap-3">
               {lead ? (
                 <Link to={`/posts/${lead.slug}`} className="btn">
-                  Read the latest
+                  Read the latest <ArrowRight size={18} aria-hidden="true" />
                 </Link>
               ) : null}
               <Link to="/archive" className="btn-ghost">
-                Browse the archive
+                <Library size={18} aria-hidden="true" /> Browse the archive
               </Link>
             </div>
           </div>
@@ -96,10 +97,15 @@ export default function Home() {
                   <Link to={`/posts/${lead.slug}`} tabIndex={-1} aria-hidden className="block">
                     <img
                       src={optimizedImageUrl(lead.cover_url, { width: 1200 }, settings?.image_resizing_enabled) ?? undefined}
+                      srcSet={imageSrcSet(lead.cover_url, settings?.image_resizing_enabled)}
+                      sizes="(min-width: 64rem) 58vw, 100vw"
+                      width={1200}
+                      height={675}
                       alt=""
                       className="cover"
                       style={{ height: "100%", aspectRatio: "auto", minHeight: "20rem" }}
                       fetchPriority="high"
+                      decoding="async"
                     />
                   </Link>
                 ) : null}
@@ -113,10 +119,15 @@ export default function Home() {
                     </Link>
                   </h2>
                   {lead.subtitle || lead.excerpt ? <p className="muted">{lead.subtitle || lead.excerpt}</p> : null}
-                  <p className="small mt-auto">
-                    <time dateTime={lead.published_at ?? undefined}>{formatDate(lead.published_at)}</time>
-                    <br />
-                    {lead.reading_minutes} min read
+                  <p className="meta small mt-auto">
+                    <span>
+                      <CalendarDays size={15} aria-hidden="true" />
+                      <time dateTime={lead.published_at ?? undefined}>{formatDate(lead.published_at)}</time>
+                    </span>
+                    <span>
+                      <Clock size={15} aria-hidden="true" />
+                      {lead.reading_minutes} min read
+                    </span>
                   </p>
                 </article>
               </section>

@@ -23,8 +23,17 @@ export function optimizedImageUrl(
   // safe to route through /cdn-cgi/image/ this way — leave external URLs
   // (e.g. a custom PUBLIC_MEDIA_BASE_URL on another domain) untouched.
   if (!url.startsWith("/")) return url;
+  if (/\.svg($|\?)/i.test(url)) return url;
 
-  const { width = 1600, quality = 80 } = options;
+  const { width = 1600, quality = 72 } = options;
   const params = [`width=${width}`, `quality=${quality}`, "format=auto"].join(",");
   return `/cdn-cgi/image/${params}${url}`;
+}
+
+export const COVER_WIDTHS = [480, 768, 1200, 1600];
+
+/** A responsive srcset for resized images; undefined when the image can't be resized. Keep in sync with worker/lib/image.ts. */
+export function imageSrcSet(url: string | null | undefined, enabled?: boolean | number): string | undefined {
+  if (!url || !enabled || !url.startsWith("/") || /\.svg($|\?)/i.test(url)) return undefined;
+  return COVER_WIDTHS.map((w) => `${optimizedImageUrl(url, { width: w }, true)} ${w}w`).join(", ");
 }

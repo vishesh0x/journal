@@ -1,10 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft, Bold, CalendarDays, Check, Clock, Code, CodeXml, ExternalLink, EyeOff, Heading2, ImagePlus, Italic,
+  Link2, List, ListOrdered, Loader, Minus, PanelRight, Quote, Save, Send, Workflow,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { Field, Icon, Section, StatusChip, TextArea, Toggle } from "@/components/dash";
+import { MarkdownContent } from "@/components/markdown-content";
 import { UploadField } from "@/components/upload-field";
-import { renderMarkdown } from "@/lib/markdown";
-import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { optimizedImageUrl } from "@/lib/image";
 import { api, type Tag } from "@/lib/api";
 
 type Draft = {
@@ -15,6 +21,7 @@ type Draft = {
   content_md: string;
   cover_url: string | null;
   status: string;
+  published_at: string | null;
   featured: boolean | number;
   meta_title: string | null;
   meta_description: string | null;
@@ -23,24 +30,34 @@ type Draft = {
   noindex: boolean | number;
 };
 
-const fieldClass =
-  "mt-1.5 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-primary";
-const labelClass = "block text-sm font-bold  text-muted-foreground";
-const cardClass = "rounded-lg border border-border bg-card p-5 sm:p-6";
-
-type ToolbarAction = { label: string; title: string; before: string; after?: string; block?: boolean };
+type ToolbarAction = { icon: LucideIcon; title: string; before: string; after?: string; block?: boolean };
 
 const toolbar: ToolbarAction[] = [
-  { label: "H2", title: "Heading", before: "## ", block: true },
-  { label: "B", title: "Bold", before: "**", after: "**" },
-  { label: "I", title: "Italic", before: "_", after: "_" },
-  { label: "“”", title: "Quote", before: "> ", block: true },
-  { label: "•", title: "List", before: "- ", block: true },
-  { label: "1.", title: "Numbered list", before: "1. ", block: true },
-  { label: "</>", title: "Code", before: "`", after: "`" },
-  { label: "Link", title: "Link", before: "[", after: "](https://)" },
-  { label: "Rule", title: "Divider", before: "\n---\n", block: true },
+  { icon: Heading2, title: "Heading", before: "\n## ", block: true },
+  { icon: Bold, title: "Bold", before: "**", after: "**" },
+  { icon: Italic, title: "Italic", before: "_", after: "_" },
+  { icon: Quote, title: "Quote", before: "\n> ", block: true },
+  { icon: List, title: "Bulleted list", before: "\n- ", block: true },
+  { icon: ListOrdered, title: "Numbered list", before: "\n1. ", block: true },
+  { icon: Code, title: "Inline code", before: "`", after: "`" },
+  { icon: CodeXml, title: "Code block", before: "\n```js\n", after: "\n```\n" },
+  { icon: Workflow, title: "Diagram (Mermaid)", before: "\n```mermaid\nflowchart LR\n  A[Idea] --> B[Draft] --> C[Publish]\n```\n", block: true },
+  { icon: Link2, title: "Link", before: "[", after: "](https://)" },
+  { icon: Minus, title: "Divider", before: "\n\n---\n\n", block: true },
 ];
+
+function toLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "Not published yet";
+  return new Date(value).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
 
 export default function PostEditor() {
   const { id } = useParams<{ id: string }>();
@@ -52,45 +69,77 @@ export default function PostEditor() {
   });
   const [form, setForm] = useState<Draft | null>(null);
   const [tagIds, setTagIds] = useState<string[]>([]);
-  const [tab, setTab] = useState<"write" | "seo">("write");
-  const [showPreview, setShowPreview] = useState(false);
+  const [tab, setTab] = useState<"write" | "details">("write");
+  const [showPreview, setShowPreview] = useState(() => window.matchMedia("(min-width: 80rem)").matches);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [inserting, setInserting] = useState(false);
   const [dropping, setDropping] = useState(false);
   const textRef = useRef<HTMLTextAreaElement>(null);
+  const saved = useRef<string>("");
 
   useEffect(() => {
     if (query.data && !form) {
       setForm({ ...query.data.post });
       setTagIds(query.data.tagIds);
+      saved.current = JSON.stringify([query.data.post, query.data.tagIds]);
     }
   }, [query.data, form]);
 
+  const dirty = form ? JSON.stringify([form, tagIds]) !== saved.current : false;
   const markdown = form?.content_md ?? "";
-  const debouncedMarkdown = useDebouncedValue(markdown, 200);
-  const preview = useMemo(() => renderMarkdown(debouncedMarkdown), [debouncedMarkdown]);
   const words = useMemo(() => markdown.trim().split(/\s+/).filter(Boolean).length, [markdown]);
+  const allTags = query.data?.tags ?? [];
+  const chosenTags = allTags.filter((t) => tagIds.includes(t.id));
 
   const save = useMutation({
-    mutationFn: (overrides: Partial<Draft & { tagIds: string[] }> = {}) =>
-      api.put(`/posts/admin/${id}`, { ...form, tagIds, ...overrides }),
-    onSuccess: (_data, variables) => {
-      if (variables && "status" in variables) {
-        setForm((prev) => (prev ? { ...prev, ...(variables as Partial<Draft>) } : prev));
-      }
+    mutationFn: (overrides: Partial<Draft> = {}) => {
+      const next = { ...(form as Draft), ...overrides };
+      return api.put(`/posts/admin/${id}`, { ...next, tagIds }).then(() => next);
+    },
+    onSuccess: (next) => {
+      setForm(next);
+      saved.current = JSON.stringify([next, tagIds]);
       setError(null);
       setStatus("Saved");
       queryClient.invalidateQueries({ queryKey: ["admin-posts"] });
       queryClient.invalidateQueries({ queryKey: ["overview"] });
-      queryClient.invalidateQueries({ queryKey: ["posts"] }); // public home/tag lists
-      queryClient.invalidateQueries({ queryKey: ["post", form?.slug] }); // this post's own public page
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      queryClient.invalidateQueries({ queryKey: ["post", next.slug] });
       setTimeout(() => setStatus(null), 2500);
     },
     onError: (err) => setError(err instanceof Error ? err.message : "Could not save."),
   });
 
-  if (!form) return <DashboardShell><div className="p-10 text-sm text-muted-foreground">Loading post…</div></DashboardShell>;
+  const saveNow = useCallback(() => {
+    if (form && !save.isPending) save.mutate({});
+  }, [form, save]);
+
+  // Ctrl/Cmd+S saves; leaving with unsaved edits asks first.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveNow();
+      }
+    };
+    const onLeave = (e: BeforeUnloadEvent) => {
+      if (dirty) e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("beforeunload", onLeave);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("beforeunload", onLeave);
+    };
+  }, [dirty, saveNow]);
+
+  if (!form)
+    return (
+      <DashboardShell>
+        <p className="dash-main muted">Loading post…</p>
+      </DashboardShell>
+    );
 
   function set<K extends keyof Draft>(key: K) {
     return (value: Draft[K]) => setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
@@ -118,8 +167,7 @@ export default function PostEditor() {
 
   function filenameToAlt(name: string): string {
     const base = name.replace(/\.[a-zA-Z0-9]+$/, "").replace(/[-_]+/g, " ").trim();
-    if (!base) return "";
-    return base.charAt(0).toUpperCase() + base.slice(1);
+    return base ? base.charAt(0).toUpperCase() + base.slice(1) : "";
   }
 
   async function insertImageFile(file: File | undefined) {
@@ -127,8 +175,7 @@ export default function PostEditor() {
     setInserting(true);
     try {
       const res = await api.upload<{ url: string }>("/media/upload", file);
-      const alt = filenameToAlt(file.name);
-      insertAtCursor(`\n![${alt}](${res.url})\n`, "", true);
+      insertAtCursor(`\n![${filenameToAlt(file.name)}](${res.url})\n`, "", true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
@@ -137,127 +184,156 @@ export default function PostEditor() {
   }
 
   const isPublished = form.status === "published";
+  const shareImage = form.og_image || form.cover_url || "";
+  const origin = typeof window !== "undefined" ? window.location.host : "yoursite.com";
 
   return (
     <DashboardShell>
-      <div className="mx-auto w-full max-w-7xl px-5 pb-16 sm:px-6">
-        <div className="sticky top-0 z-30 -mx-5 mb-6 border-b border-border bg-background px-5 py-4 sm:-mx-6 sm:px-6">
+      <div className="dash-main" style={{ maxWidth: "88rem", paddingTop: 0 }}>
+        <div className="sticky-bar" style={{ marginInline: "calc(var(--space-lg) * -1)", padding: "var(--space-sm) var(--space-lg)" }}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-4">
-              <Link
-                to="/dashboard"
-                className="text-sm font-bold  text-muted-foreground transition-colors hover:text-primary"
-              >
-                All posts
+              <Link to="/dashboard" className="text-link inline-flex items-center gap-2" style={{ textDecoration: "none" }}>
+                <Icon as={ArrowLeft} /> All posts
               </Link>
-              <span
-                className={`rounded-full border px-2.5 py-0.5 text-sm font-semibold capitalize ${
-                  isPublished ? "border-primary/40 text-primary" : "border-border text-muted-foreground"
-                }`}
-              >
-                {form.status}
-              </span>
+              <StatusChip on={isPublished}>{form.status}</StatusChip>
+              {dirty ? <span className="small">Unsaved changes</span> : null}
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              {status ? <span className="text-xs font-semibold text-primary">{status}</span> : null}
-              <span className="hidden text-xs text-muted-foreground sm:inline">
-                {words} words, about {Math.max(1, Math.round(words / 200))} min
+              {status ? (
+                <span role="status" className="inline-flex items-center gap-1 font-bold" style={{ color: "var(--color-success)" }}>
+                  <Icon as={Check} /> {status}
+                </span>
+              ) : null}
+              <span className="small hidden items-center gap-1 sm:inline-flex">
+                <Icon as={Clock} size={15} /> {words} words, about {Math.max(1, Math.round(words / 200))} min
               </span>
-              <button
-                onClick={() => save.mutate({})}
-                disabled={save.isPending}
-                className="btn-ghost"
-              >
-                {save.isPending ? "Saving…" : "Save"}
+              {isPublished ? (
+                <a href={`/posts/${form.slug}`} target="_blank" rel="noreferrer" className="btn-ghost">
+                  <Icon as={ExternalLink} /> View
+                </a>
+              ) : null}
+              <button type="button" onClick={saveNow} disabled={save.isPending || !dirty} className="btn-ghost">
+                <Icon as={save.isPending ? Loader : Save} /> {save.isPending ? "Saving…" : "Save"}
               </button>
               {isPublished ? (
-                <button
-                  onClick={() => save.mutate({ status: "draft" })}
-                  className="rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors hover:border-destructive hover:text-destructive"
-                >
-                  Unpublish
+                <button type="button" onClick={() => save.mutate({ status: "draft" })} className="btn-ghost">
+                  <Icon as={EyeOff} /> Unpublish
                 </button>
               ) : (
-                <button
-                  onClick={() => save.mutate({ status: "published" })}
-                  className="btn"
-                >
-                  Publish
+                <button type="button" onClick={() => save.mutate({ status: "published" })} className="btn">
+                  <Icon as={Send} /> Publish
                 </button>
               )}
             </div>
           </div>
         </div>
 
-        {error ? <p className="mb-4 text-sm text-destructive">{error}</p> : null}
+        {error ? (
+          <p role="alert" className="notice mt-4">
+            {error}
+          </p>
+        ) : null}
 
-        <div className="mb-6 inline-flex rounded-md border border-border p-1">
-          {(["write", "seo"] as const).map((key) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition-colors ${
-                tab === key ? "bg-surface text-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {key === "seo" ? "Search & sharing" : "Write"}
+        <div className="my-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="seg" role="tablist" aria-label="Editor sections">
+            <button type="button" role="tab" aria-selected={tab === "write"} onClick={() => setTab("write")}>
+              Write
             </button>
-          ))}
+            <button type="button" role="tab" aria-selected={tab === "details"} onClick={() => setTab("details")}>
+              Details and sharing
+            </button>
+          </div>
           {tab === "write" ? (
-            <button
-              type="button"
-              onClick={() => setShowPreview((v) => !v)}
-              className={`ml-auto rounded-lg px-4 py-1.5 text-sm font-semibold transition-colors ${
-                showPreview ? "bg-surface text-foreground" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {showPreview ? "Hide preview" : "Show preview"}
+            <button type="button" className="btn-ghost" aria-pressed={showPreview} onClick={() => setShowPreview((v) => !v)}>
+              <Icon as={PanelRight} /> {showPreview ? "Hide preview" : "Show preview"}
             </button>
           ) : null}
         </div>
 
         {tab === "write" ? (
-          <div className={showPreview ? "grid gap-6 lg:grid-cols-[1fr_1fr]" : "grid gap-6"}>
-            <div className="space-y-5">
+          <div className="grid gap-6" style={{ gridTemplateColumns: showPreview ? "repeat(auto-fit, minmax(min(100%, 30rem), 1fr))" : "minmax(0, 1fr)" }}>
+            <div className="flex min-w-0 flex-col gap-5">
               <UploadField
                 label="Cover image"
                 value={form.cover_url}
                 onChange={set("cover_url")}
-                hint="Wide images look best — around 1600×700."
+                hint="Wide images look best, around 1600 by 700. It is cropped to fit."
               />
 
               <div>
-                <input
+                <label htmlFor="post-title" className="visually-hidden">
+                  Post title
+                </label>
+                <textarea
+                  id="post-title"
+                  rows={1}
+                  maxLength={300}
                   value={form.title}
-                  onChange={(e) => set("title")(e.target.value)}
+                  onChange={(e) => set("title")(e.target.value.replace(/\n/g, " "))}
                   placeholder="Post title"
-                  className="w-full bg-transparent font-display text-3xl font-bold tracking-tighter outline-none placeholder:text-muted-foreground/40 sm:text-4xl"
+                  className="editor-title"
+                  style={{ resize: "none", fieldSizing: "content" } as React.CSSProperties}
                 />
+                <label htmlFor="post-subtitle" className="visually-hidden">
+                  Subtitle
+                </label>
                 <input
+                  id="post-subtitle"
                   value={form.subtitle ?? ""}
+                  maxLength={300}
                   onChange={(e) => set("subtitle")(e.target.value)}
                   placeholder="Subtitle (optional)"
-                  className="mt-2 w-full bg-transparent text-lg text-muted-foreground outline-none placeholder:text-muted-foreground/50"
+                  className="editor-sub"
                 />
               </div>
 
-              <div className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-surface p-1.5">
+              <div>
+                <p className="form-label">Topics</p>
+                <div className="chips">
+                  {allTags.map((tag) => {
+                    const on = tagIds.includes(tag.id);
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setTagIds(on ? tagIds.filter((t) => t !== tag.id) : [...tagIds, tag.id])}
+                        className={`chip ${on ? "chip-on" : ""}`}
+                        style={{ cursor: "pointer", background: on ? undefined : "transparent", color: on ? undefined : "var(--color-ink)" }}
+                      >
+                        {on ? <Icon as={Check} size={14} /> : null}
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+                  {allTags.length === 0 ? (
+                    <Link to="/dashboard/tags" className="text-link">
+                      Create your first topic
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="toolbar" role="toolbar" aria-label="Formatting">
                 {toolbar.map((action) => (
                   <button
                     key={action.title}
                     type="button"
                     title={action.title}
+                    aria-label={action.title}
                     onClick={() => insertAtCursor(action.before, action.after ?? "", action.block)}
-                    className="rounded-lg px-2.5 py-1.5 text-xs font-bold text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                    className="tool-btn"
                   >
-                    {action.label}
+                    <Icon as={action.icon} />
                   </button>
                 ))}
-                <label className="ml-auto cursor-pointer rounded-lg px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-background">
-                  {inserting ? "Uploading…" : "Insert image"}
+                <label className="tool-btn ml-auto" title="Insert image" style={{ cursor: "pointer" }}>
+                  <Icon as={inserting ? Loader : ImagePlus} />
+                  <span className="visually-hidden">Insert image</span>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp,image/gif,image/avif,image/svg+xml"
                     className="hidden"
                     onChange={(e) => {
                       void insertImageFile(e.target.files?.[0]);
@@ -280,11 +356,14 @@ export default function PostEditor() {
                     void insertImageFile(e.dataTransfer.files[0]);
                   }
                 }}
-                className={`relative rounded-lg border transition-colors ${
-                  dropping ? "border-primary bg-primary/5" : "border-border bg-card"
-                }`}
+                className="panel"
+                style={dropping ? { background: "var(--color-paper-3)", borderStyle: "dashed" } : undefined}
               >
+                <label htmlFor="post-body" className="visually-hidden">
+                  Post body in Markdown
+                </label>
                 <textarea
+                  id="post-body"
                   ref={textRef}
                   value={markdown}
                   onChange={(e) => set("content_md")(e.target.value)}
@@ -295,163 +374,134 @@ export default function PostEditor() {
                       void insertImageFile(file);
                     }
                   }}
-                  placeholder="Write in Markdown… drop or paste an image anywhere."
-                  className={`w-full resize-y rounded-lg bg-transparent p-4 font-mono text-[13px] leading-relaxed outline-none sm:p-5 ${
-                    showPreview ? "min-h-[45vh] sm:min-h-[60vh]" : "min-h-[55vh] sm:min-h-[75vh]"
-                  }`}
+                  placeholder="Write in Markdown. Drop or paste an image anywhere."
+                  spellCheck
+                  className="editor-area code-area"
+                  style={{ minHeight: "60svh" }}
                 />
-                {dropping ? (
-                  <div className="pointer-events-none absolute inset-0 grid place-items-center rounded-lg text-sm font-bold text-primary">
-                    Drop to upload
-                  </div>
-                ) : null}
               </div>
             </div>
 
             {showPreview ? (
-              <div className="lg:sticky lg:top-28 lg:h-fit">
-                <div className="overflow-hidden rounded-lg border border-border bg-card">
-                  <p className="border-b border-border px-6 py-3 text-sm font-bold  text-muted-foreground">
-                    Live preview
-                  </p>
-                  <div className="max-h-[72vh] overflow-auto p-6">
-                    {form.cover_url ? (
-                      <img src={form.cover_url} alt={form.title || "Cover"} className="mb-6 aspect-[16/7] w-full rounded-md object-cover" />
-                    ) : null}
-                    <h1 className="break-words font-display text-3xl font-bold leading-tight tracking-tighter sm:text-4xl">
+              <aside aria-label="Live preview" className="min-w-0">
+                <div className="panel preview-pane lg:sticky" style={{ top: "5.5rem" }}>
+                  <h2 className="visually-hidden">Preview, as readers see it</h2>
+                  <article style={{ padding: "var(--space-lg)" }}>
+                    <h1 className="display-s" style={{ fontSize: "var(--text-section)", overflowWrap: "anywhere" }}>
                       {form.title || "Untitled post"}
                     </h1>
-                    {form.subtitle ? <p className="mt-3 text-lg text-muted-foreground">{form.subtitle}</p> : null}
-                    <div className="prose-journal mt-6" dangerouslySetInnerHTML={{ __html: preview }} />
-                  </div>
+                    {form.subtitle ? <p className="lead mt-4">{form.subtitle}</p> : null}
+                    <div className="meta mt-4">
+                      <span>
+                        <Icon as={CalendarDays} size={15} />
+                        <time>{formatDate(form.published_at)}</time>
+                      </span>
+                      <span>
+                        <Icon as={Clock} size={15} /> {Math.max(1, Math.round(words / 200))} min read
+                      </span>
+                    </div>
+                    {chosenTags.length ? (
+                      <div className="chips mt-4">
+                        {chosenTags.map((tag) => (
+                          <span key={tag.id} className="chip">
+                            {tag.name}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {form.cover_url ? (
+                      <img src={optimizedImageUrl(form.cover_url, { width: 1200 }, false) ?? undefined} alt="" className="cover mt-6" />
+                    ) : null}
+                    <MarkdownContent markdown={markdown} className="mt-6" />
+                  </article>
                 </div>
-              </div>
+              </aside>
             ) : null}
           </div>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-            <div className={`${cardClass} space-y-5`}>
-              <div>
-                <label className={labelClass}>Address</label>
-                <input className={fieldClass} value={form.slug} onChange={(e) => set("slug")(e.target.value)} />
-                <p className="mt-1.5 text-xs text-muted-foreground">/posts/{form.slug}</p>
-              </div>
-              <div>
-                <label className={labelClass}>Search title</label>
-                <input
-                  className={fieldClass}
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
+            <div className="flex min-w-0 flex-col gap-6">
+              <Section title="Publishing">
+                <div className="form-grid two">
+                  <Field id="post-slug" label="Address" value={form.slug} onChange={(e) => set("slug")(e.target.value)} hint={`/posts/${form.slug}`} />
+                  <Field
+                    id="post-date"
+                    label="Publish date"
+                    type="datetime-local"
+                    value={toLocalInput(form.published_at)}
+                    onChange={(e) => set("published_at")(e.target.value ? new Date(e.target.value).toISOString() : null)}
+                    hint="A date in the future schedules the post: it goes live then."
+                  />
+                </div>
+                <Toggle id="post-featured" label="Pin to the top of the home page" checked={Boolean(form.featured)} onChange={set("featured")} />
+              </Section>
+
+              <Section title="Search and sharing">
+                <Field
+                  id="post-meta-title"
+                  label="Search title"
                   value={form.meta_title ?? ""}
                   onChange={(e) => set("meta_title")(e.target.value)}
+                  hint={`${(form.meta_title ?? form.title ?? "").length} of 60 characters`}
                 />
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  {(form.meta_title ?? form.title ?? "").length} / 60
-                </p>
-              </div>
-              <div>
-                <label className={labelClass}>Search description</label>
-                <textarea
+                <TextArea
+                  id="post-meta-desc"
+                  label="Search description"
                   rows={3}
-                  className={fieldClass}
                   value={form.meta_description ?? ""}
                   onChange={(e) => set("meta_description")(e.target.value)}
+                  hint={`${(form.meta_description ?? "").length} of 160 characters`}
                 />
-                <p className="mt-1.5 text-xs text-muted-foreground">{(form.meta_description ?? "").length} / 160</p>
-              </div>
-              <div>
-                <label className={labelClass}>Excerpt</label>
-                <textarea
+                <TextArea
+                  id="post-excerpt"
+                  label="Excerpt"
                   rows={2}
-                  className={fieldClass}
                   value={form.excerpt ?? ""}
                   onChange={(e) => set("excerpt")(e.target.value)}
+                  hint="Shown on tiles and in the feed. Left empty, it is taken from the start of the post."
                 />
-              </div>
-              <UploadField label="Share image" value={form.og_image} onChange={set("og_image")} hint="1200×630 recommended." />
-              <div>
-                <label className={labelClass}>Canonical URL</label>
-                <input
-                  className={fieldClass}
+                <UploadField
+                  label="Share image"
+                  value={form.og_image}
+                  onChange={set("og_image")}
+                  hint="1200 by 630 works best. Use PNG or JPEG: most social sites ignore SVG."
+                />
+                <Field
+                  id="post-canonical"
+                  label="Canonical URL"
                   value={form.canonical_url ?? ""}
                   onChange={(e) => set("canonical_url")(e.target.value)}
                   placeholder="Only if first published elsewhere"
                 />
-              </div>
-              <div className="flex flex-wrap gap-5">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(form.featured)}
-                    onChange={(e) => set("featured")(e.target.checked)}
-                  />
-                  Feature on the home page
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(form.noindex)}
-                    onChange={(e) => set("noindex")(e.target.checked)}
-                  />
-                  Hide from search engines
-                </label>
-              </div>
-              <div>
-                <label className={labelClass}>Topics</label>
-                <div className="mt-2.5 flex flex-wrap gap-2">
-                  {(query.data?.tags ?? []).map((tag) => {
-                    const on = tagIds.includes(tag.id);
-                    return (
-                      <button
-                        key={tag.id}
-                        type="button"
-                        onClick={() => setTagIds(on ? tagIds.filter((t) => t !== tag.id) : [...tagIds, tag.id])}
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-                          on
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border text-muted-foreground hover:border-primary"
-                        }`}
-                      >
-                        {tag.name}
-                      </button>
-                    );
-                  })}
-                  {(query.data?.tags ?? []).length === 0 ? (
-                    <Link to="/dashboard/tags" className="text-xs text-primary underline underline-offset-2">
-                      Create your first topic
-                    </Link>
-                  ) : null}
-                </div>
-              </div>
+                <Toggle id="post-noindex" label="Hide from search engines" checked={Boolean(form.noindex)} onChange={set("noindex")} />
+              </Section>
             </div>
 
-            <div className="space-y-5">
-              <div className="rounded-lg border border-border bg-card p-5">
-                <p className={labelClass}>Google preview</p>
-                <p className="mt-3 truncate text-xs text-muted-foreground">yoursite.com › posts › {form.slug}</p>
-                <p className="mt-1 text-lg leading-snug text-primary">
-                  {form.meta_title || form.title}
-                </p>
-                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                  {form.meta_description || form.excerpt || "Add a description to control this text."}
-                </p>
-              </div>
-              <div className="overflow-hidden rounded-lg border border-border bg-card">
-                <p className={`${labelClass} px-5 pt-5`}>Social preview</p>
-                <div className="mt-3">
-                  {form.og_image || form.cover_url ? (
-                    <img src={form.og_image || form.cover_url || ""} alt="" className="aspect-[1200/630] w-full object-cover" />
-                  ) : (
-                    <div className="flex aspect-[1200/630] items-center justify-center bg-surface text-xs text-muted-foreground">
-                      No share image
-                    </div>
-                  )}
-                  <div className="p-5">
-                    <p className="text-sm font-bold">{form.meta_title || form.title}</p>
-                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                      {form.meta_description || form.excerpt}
-                    </p>
-                  </div>
+            <div className="flex min-w-0 flex-col gap-6">
+              <section className="section-card">
+                <h2>Search result</h2>
+                <div>
+                  <p className="small truncate">{origin} / posts / {form.slug}</p>
+                  <p className="mt-1 text-lg font-bold" style={{ color: "var(--color-signal)", overflowWrap: "anywhere" }}>
+                    {form.meta_title || form.title || "Untitled post"}
+                  </p>
+                  <p className="small mt-1 line-clamp-2">{form.meta_description || form.excerpt || "Add a description to control this text."}</p>
                 </div>
-              </div>
+              </section>
+              <section className="section-card" style={{ overflow: "hidden" }}>
+                <h2>Social card</h2>
+                {shareImage ? (
+                  <img src={shareImage} alt="" className="cover" style={{ aspectRatio: "1200 / 630", borderRadius: "var(--radius-panel)" }} />
+                ) : (
+                  <div className="drop" style={{ aspectRatio: "1200 / 630", cursor: "default" }}>
+                    <span className="small">No share image yet</span>
+                  </div>
+                )}
+                <div>
+                  <p className="font-bold" style={{ overflowWrap: "anywhere" }}>{form.meta_title || form.title}</p>
+                  <p className="small mt-1 line-clamp-2">{form.meta_description || form.excerpt}</p>
+                </div>
+              </section>
             </div>
           </div>
         )}

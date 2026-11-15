@@ -3,6 +3,7 @@ import { Link, NavLink } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, SOCIAL_PLATFORMS, type SiteSettings, type StaticPageSummary } from "@/lib/api";
 import { decodeEmail } from "@/lib/obfuscate";
+import { Globe, Mail, Menu, Rss, Search as SearchIcon, X } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 
 const SOCIAL_LABELS: Record<string, string> = {
@@ -36,10 +37,6 @@ export function SiteShell({ children }: { children: ReactNode }) {
   const footerPages = (pages ?? []).filter((p) => p.show_in_footer);
 
   useEffect(() => {
-    // "#c4633c" is the old terracotta default; treat it as unset so the new navy signal shows
-    if (settings?.accent && settings.accent.toLowerCase() !== "#c4633c") {
-      document.documentElement.style.setProperty("--primary", settings.accent);
-    }
     if (settings?.favicon_url) {
       let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
       if (!link) {
@@ -49,7 +46,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
       }
       link.href = settings.favicon_url;
     }
-  }, [settings?.accent, settings?.favicon_url]);
+  }, [settings?.favicon_url]);
 
   useEffect(() => {
     if (!settings?.analytics_script) return;
@@ -90,8 +87,9 @@ export function SiteShell({ children }: { children: ReactNode }) {
           {page.title}
         </NavLink>
       ))}
-      <NavLink to="/search" className="nav-link" onClick={closeMenu}>
-        Search
+      <NavLink to="/search" className="nav-link nav-icon-link" onClick={closeMenu} aria-label="Search">
+        <SearchIcon size={18} strokeWidth={2.25} aria-hidden="true" />
+        <span className="nav-label-mobile">Search</span>
       </NavLink>
     </>
   );
@@ -118,12 +116,13 @@ export function SiteShell({ children }: { children: ReactNode }) {
               <ThemeToggle defaultMode={settings?.theme_mode} />
               <button
                 type="button"
-                className="nav-btn nav-menu-btn"
+                className="nav-btn nav-menu-btn nav-icon"
                 aria-expanded={menuOpen}
                 aria-controls="mobile-menu"
                 onClick={() => setMenuOpen((v) => !v)}
               >
-                {menuOpen ? "Close" : "Menu"}
+                {menuOpen ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}
+                <span className="visually-hidden">{menuOpen ? "Close menu" : "Open menu"}</span>
               </button>
             </div>
           </div>
@@ -155,7 +154,8 @@ export function SiteShell({ children }: { children: ReactNode }) {
                   const value = key === "email" ? decodeEmail(raw) : raw;
                   const href = key === "email" ? (value.startsWith("mailto:") ? value : `mailto:${value}`) : value;
                   return (
-                    <a key={key} href={href} target="_blank" rel="noreferrer" className="text-link">
+                    <a key={key} href={href} target="_blank" rel="noreferrer noopener" className="text-link inline-flex items-center gap-2">
+                      {key === "email" ? <Mail size={16} aria-hidden="true" /> : key === "website" ? <Globe size={16} aria-hidden="true" /> : null}
                       {SOCIAL_LABELS[key] ?? key}
                     </a>
                   );
@@ -163,8 +163,8 @@ export function SiteShell({ children }: { children: ReactNode }) {
               ) : (
                 <span className="small">No links yet</span>
               )}
-              <a href="/rss.xml" className="text-link">
-                RSS feed
+              <a href="/rss.xml" className="text-link inline-flex items-center gap-2">
+                <Rss size={16} aria-hidden="true" /> RSS feed
               </a>
             </div>
             <div className="foot-col">

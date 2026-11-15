@@ -3,6 +3,7 @@ export type Bindings = {
   MEDIA: R2Bucket;
   ASSETS: Fetcher;
   SESSION_SECRET: string; // set with: wrangler secret put SESSION_SECRET
+  SETUP_TOKEN?: string; // optional: when set, creating the first account requires it
   PUBLIC_MEDIA_BASE_URL?: string;
 };
 

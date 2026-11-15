@@ -3,6 +3,7 @@ import type { AppEnv } from "../types";
 import { requireAdmin } from "../middleware/auth";
 import { obfuscateEmail } from "../lib/obfuscate";
 import { cacheControl } from "../middleware/cache";
+import { EMAIL_RE, HttpError, cleanFields, readJson, safeUrl, type Rule } from "../lib/validate";
 
 const app = new Hono<AppEnv>();
 
@@ -32,43 +33,57 @@ app.get("/admin", requireAdmin, async (c) => {
   return c.json(shapeSettings(row ?? null));
 });
 
-const PATCHABLE_FIELDS = [
-  "site_name",
-  "tagline",
-  "description",
-  "author_name",
-  "author_bio",
-  "author_avatar_url",
-  "favicon_url",
-  "logo_url",
-  "accent",
-  "theme_mode",
-  "about_markdown",
-  "footer_text",
-  "social_links", // object of platform -> url in the JSON body, re-serialized to text below
-  "default_meta_title",
-  "default_meta_description",
-  "default_og_image",
-  "posts_per_page",
-  "newsletter_enabled",
-  "newsletter_headline",
-  "newsletter_blurb",
-  "analytics_script",
-  "image_resizing_enabled",
-] as const;
+const SOCIAL_KEYS = ["twitter", "github", "linkedin", "instagram", "mastodon", "website", "email"];
+
+const RULES: Record<string, Rule> = {
+  site_name: "text",
+  tagline: "text",
+  description: "text",
+  author_name: "text",
+  author_bio: "text",
+  author_avatar_url: "url",
+  favicon_url: "url",
+  logo_url: "url",
+  theme_mode: "enum:system,light,dark",
+  about_markdown: "long",
+  footer_text: "text",
+  default_meta_title: "text",
+  default_meta_description: "text",
+  default_og_image: "url",
+  posts_per_page: "int",
+  newsletter_enabled: "bool",
+  newsletter_headline: "text",
+  newsletter_blurb: "text",
+  analytics_script: "text",
+  image_resizing_enabled: "bool",
+};
+
+function cleanSocialLinks(value: unknown): string {
+  if (value === null || value === undefined) return "{}";
+  if (typeof value !== "object" || Array.isArray(value)) throw new HttpError(400, "Social links must be an object.");
+  const out: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (!SOCIAL_KEYS.includes(key) || raw === "" || raw === null || raw === undefined) continue;
+    if (typeof raw !== "string" || raw.length > 500) throw new HttpError(400, `The ${key} link is not valid.`);
+    if (key === "email") {
+      if (!EMAIL_RE.test(raw.replace(/^mailto:/, "").trim())) throw new HttpError(400, "The email link is not valid.");
+      out[key] = raw.trim();
+    } else {
+      out[key] = safeUrl(raw, `The ${key} link`) as string;
+    }
+  }
+  return JSON.stringify(out);
+}
 
 app.put("/admin", requireAdmin, async (c) => {
-  const body = await c.req.json<Record<string, unknown>>();
-  const update: Record<string, unknown> = {};
-  for (const field of PATCHABLE_FIELDS) if (field in body) update[field] = body[field];
-  if ("social_links" in update) update.social_links = JSON.stringify(update.social_links ?? {});
-  if ("posts_per_page" in update) {
-    const n = Number(update.posts_per_page);
-    update.posts_per_page = Number.isFinite(n) ? Math.min(50, Math.max(1, Math.trunc(n))) : 8;
-  }
+  const body = await readJson<Record<string, unknown>>(c);
+  const update = cleanFields(body, RULES);
+  if ("social_links" in body) update.social_links = cleanSocialLinks(body.social_links);
+  if ("posts_per_page" in update) update.posts_per_page = Math.min(50, Math.max(1, update.posts_per_page as number));
 
   const keys = Object.keys(update);
   if (keys.length === 0) return c.json({ ok: true });
+  // Column names come from the fixed rule map above, never from the request.
   const setSql = keys.map((k) => `${k} = ?`).join(", ");
   await c.env.DB.prepare(`UPDATE site_settings SET ${setSql}, updated_at = datetime('now') WHERE id = 'main'`)
     .bind(...keys.map((k) => update[k]))

@@ -385,6 +385,26 @@ The frontend was rebuilt with Hallmark (custom run) from the PencilBooth, Fold a
 - `src/tokens.css`: every colour, face, size and radius (light and `.dark`). Nothing is hard-coded below it.
 - `src/styles.css`: the Hallmark stamp, waivers, and component classes (`.tile`, `.btn`, `.chip`, `.field`, `.row-2`, `.prose-journal`).
 - Type: Paper Mono (OFL) self-hosted from `public/fonts/`, variable weight. Body uses the duospace and narrow-space features (`ss02`, `ss03`), code uses ligatures and the slashed zero (`ss01`, `zero`), lead text uses the single-story a (`cv01`).
-- The old terracotta accent `#c4633c` is treated as unset; any other accent saved in Settings still drives links and the active nav state.
+- The accent colour setting was removed: colour comes from the tokens, with one lime action colour and a navy active state.
 - Static pages no longer render their `eyebrow` field (Hallmark bans eyebrows); it is still editable.
 - Local dev needs a `.dev.vars` file with `SESSION_SECRET=...` (not included).
+
+## Content features
+
+- **Mermaid diagrams**: a fenced block tagged `mermaid` renders as a diagram (strict security mode, follows light and dark). The renderer loads only on posts that contain one.
+- **Code**: syntax highlighting, plus Paper Mono's coding ligatures (`==`, `!=`, `=>`, `>=`) and slashed zero inside code.
+- **SVG uploads**: allowed, but only plain SVGs that pass an allowlist (no scripts, event handlers, external links, DOCTYPE or entities). SVGs are shown through `<img>` and served with a sandboxing CSP.
+- **Scheduling and pinning**: the post editor has a publish date (future dates schedule the post) and a pin-to-top option. Pinned posts lead the home page.
+- Ctrl/Cmd+S saves in the editors, and leaving with unsaved edits asks first.
+
+## Security notes
+
+- Dependencies: `npm audit` reports 0 vulnerabilities; the deprecated `drizzle-kit` chain was removed (migrations were always plain SQL).
+- Session cookie is `__Host-journal_session` (HttpOnly, Secure, SameSite=Lax), valid 7 days. Writes from another origin are rejected.
+- Login is limited to 8 tries per email and 20 per IP every 15 minutes (so someone can briefly lock the owner out by guessing; it clears after 15 minutes). Sign-ups are limited per IP. Run `npx wrangler d1 migrations apply journal_db --remote` to create the `rate_limits` table (migration 0004).
+- Optional: set `SETUP_TOKEN` (`npx wrangler secret put SETUP_TOKEN`) so only someone with that code can create the first account.
+- Uploads are checked by their contents, not their declared type, and stored under random names.
+- Settings, post and page fields are validated on the server (URLs must be http or https, text has length limits).
+- The CSP allows scripts from this site only. If you paste an analytics snippet in Settings, the policy relaxes to allow it. Cloudflare Web Analytics is allowed by default.
+- Known trade-off: PBKDF2 is capped at 100,000 iterations by the Workers runtime.
+- `/llms.txt` is generated from your posts and pages. Unknown files and `/.well-known/` paths return a real 404.

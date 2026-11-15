@@ -37,6 +37,8 @@ export async function hashPassword(password: string): Promise<string> {
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const parts = stored.split(":");
   if (parts.length !== 4 || parts[0] !== "pbkdf2") return false;
+  // Workers cap PBKDF2 at 100,000 iterations; ignore any other stored count rather than trust it.
+  if (Number(parts[1]) !== ITERATIONS || !/^[0-9a-f]+$/.test(parts[2]!) || parts[2]!.length % 2 !== 0) return false;
   const salt = fromHex(parts[2]!);
   const derived = await deriveBits(password, salt);
   const actual = toHex(derived);

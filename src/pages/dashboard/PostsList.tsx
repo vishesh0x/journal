@@ -1,6 +1,8 @@
+import { ExternalLink, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { PageHead, StatusChip } from "@/components/dash";
 import { api } from "@/lib/api";
 
 type Overview = { published: number; drafts: number; subscribers: number; tagCount: number };
@@ -11,11 +13,6 @@ type AdminPost = {
   status: string;
   updated_at: string;
   view_count: number;
-};
-
-const statusStyles: Record<string, string> = {
-  published: "border-primary/40 text-primary",
-  draft: "border-border text-muted-foreground",
 };
 
 export default function PostsList() {
@@ -40,91 +37,74 @@ export default function PostsList() {
   });
 
   const stats = [
-    { label: "Published", value: overview.data?.published ?? 0 },
-    { label: "Drafts", value: overview.data?.drafts ?? 0 },
-    { label: "Subscribers", value: overview.data?.subscribers ?? 0 },
-    { label: "Topics", value: overview.data?.tagCount ?? 0 },
+    { label: "Published", value: overview.data?.published ?? 0, tone: "tone-b" },
+    { label: "Drafts", value: overview.data?.drafts ?? 0, tone: "tone-c" },
+    { label: "Subscribers", value: overview.data?.subscribers ?? 0, tone: "tone-a" },
+    { label: "Topics", value: overview.data?.tagCount ?? 0, tone: "tone-e" },
   ];
 
   return (
     <DashboardShell>
-      <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:py-10">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="font-display text-2xl tracking-tight sm:text-3xl">Your writing</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Drafts stay private until you publish them.</p>
-          </div>
-          <button
-            onClick={() => create.mutate()}
-            disabled={create.isPending}
-            className="btn"
-          >
-            {create.isPending ? "Creating…" : "New post"}
-          </button>
-        </div>
+      <div className="dash-main">
+        <PageHead
+          title="Your writing"
+          hint="Drafts stay private until you publish them."
+          action={
+            <button type="button" onClick={() => create.mutate()} disabled={create.isPending} className="btn">
+              <Plus size={18} aria-hidden="true" /> {create.isPending ? "Creating…" : "New post"}
+            </button>
+          }
+        />
 
-        <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="stat-grid">
           {stats.map((stat) => (
-            <div key={stat.label} className="rounded-lg border border-border bg-surface px-4 py-4">
-              <p className="font-display text-2xl sm:text-3xl">{stat.value}</p>
-              <p className="mt-0.5 text-xs  text-muted-foreground">{stat.label}</p>
+            <div key={stat.label} className={`tile stat ${stat.tone}`}>
+              <p className="stat-n">{stat.value}</p>
+              <p className="small mt-2">{stat.label}</p>
             </div>
           ))}
         </div>
 
-        <div className="mt-10 overflow-hidden rounded-lg border border-border">
+        <div className="panel">
           {posts.isLoading ? (
-            <p className="p-6 text-sm text-muted-foreground">Loading posts…</p>
+            <p className="panel-empty">Loading posts…</p>
           ) : (posts.data ?? []).length === 0 ? (
-            <p className="p-8 text-center text-sm text-muted-foreground">Nothing written yet. Start your first post.</p>
+            <p className="panel-empty">Nothing written yet. Start your first post.</p>
           ) : (
-            <ul className="divide-y divide-border">
-              {(posts.data ?? []).map((post) => (
-                <li key={post.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
-                  <div className="min-w-0 flex-1">
-                    <button
-                      onClick={() => navigate(`/dashboard/posts/${post.id}`)}
-                      className="text-left font-display text-lg leading-snug hover:text-primary"
-                    >
-                      {post.title}
-                    </button>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      /{post.slug}, updated {new Date(post.updated_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full border px-2.5 py-0.5 text-xs capitalize ${
-                      statusStyles[post.status] ?? statusStyles["draft"]
-                    }`}
-                  >
-                    {post.status}
-                  </span>
-                  {post.status === "published" ? (
-                    <span className="text-xs text-muted-foreground" title="Views">
-                      {post.view_count} {post.view_count === 1 ? "view" : "views"}
-                    </span>
-                  ) : null}
-                  {post.status === "published" ? (
-                    <a
-                      href={`/posts/${post.slug}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      View
-                    </a>
-                  ) : null}
-                  <button
-                    onClick={() => {
-                      if (confirm(`Delete "${post.title}"? This can't be undone.`)) remove.mutate(post.id);
-                    }}
-                    className="text-xs text-muted-foreground transition-colors hover:text-destructive"
-                  >
-                    Delete
+            (posts.data ?? []).map((post) => (
+              <div key={post.id} className="panel-row">
+                <div className="row-main">
+                  <button type="button" onClick={() => navigate(`/dashboard/posts/${post.id}`)} className="row-title">
+                    {post.title}
                   </button>
-                </li>
-              ))}
-            </ul>
+                  <p className="small mt-1">
+                    /{post.slug}, updated {new Date(post.updated_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <StatusChip on={post.status === "published"}>{post.status}</StatusChip>
+                {post.status === "published" ? (
+                  <span className="small">
+                    {post.view_count} {post.view_count === 1 ? "view" : "views"}
+                  </span>
+                ) : null}
+                {post.status === "published" ? (
+                  <a href={`/posts/${post.slug}`} target="_blank" rel="noreferrer" className="icon-btn" aria-label={`View ${post.title}`} title="View on the site">
+                    <ExternalLink size={18} aria-hidden="true" />
+                  </a>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm(`Delete “${post.title}”? This can’t be undone.`)) remove.mutate(post.id);
+                  }}
+                  className="icon-btn danger"
+                  aria-label={`Delete ${post.title}`}
+                  title="Delete"
+                >
+                  <Trash2 size={18} aria-hidden="true" />
+                </button>
+              </div>
+            ))
           )}
         </div>
       </div>

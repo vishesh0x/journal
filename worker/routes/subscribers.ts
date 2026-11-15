@@ -2,14 +2,16 @@ import { Hono } from "hono";
 import type { AppEnv } from "../types";
 import { requireAdmin } from "../middleware/auth";
 import { newId } from "../lib/content";
+import { EMAIL_RE, HttpError } from "../lib/validate";
+import { clientIp, hit } from "../lib/throttle";
 
 const app = new Hono<AppEnv>();
 
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-
 app.post("/subscribe", async (c) => {
   const { email: raw } = await c.req.json<{ email?: string }>().catch(() => ({ email: undefined }));
-  const email = (raw ?? "").trim().toLowerCase();
+  const email = (typeof raw === "string" ? raw : "").trim().toLowerCase();
+  const gate = await hit(c.env.DB, `subscribe:${clientIp(c)}`, 10, 3600);
+  if (!gate.allowed) throw new HttpError(429, "Too many sign-ups from this address. Try again later.");
   if (!EMAIL_RE.test(email)) return c.json({ error: "Please enter a valid email address." }, 400);
 
   const existing = await c.env.DB.prepare("SELECT id, status FROM subscribers WHERE email = ?")
@@ -21,19 +23,19 @@ app.post("/subscribe", async (c) => {
         .bind(existing.id)
         .run();
     }
-    return c.json({ ok: true, message: "You're on the list." });
+    return c.json({ ok: true, message: "You’re on the list." });
   }
   await c.env.DB.prepare(
     "INSERT INTO subscribers (id, email, status, token, source, created_at) VALUES (?, ?, 'active', ?, 'site', datetime('now'))",
   )
     .bind(newId("sub"), email, crypto.randomUUID())
     .run();
-  return c.json({ ok: true, message: "You're on the list." });
+  return c.json({ ok: true, message: "You’re on the list." });
 });
 
 app.post("/unsubscribe", async (c) => {
   const { token } = await c.req.json<{ token?: string }>().catch(() => ({ token: undefined }));
-  if (!token) return c.json({ ok: false, message: "That unsubscribe link is not valid." }, 400);
+  if (typeof token !== "string" || token.length > 64) return c.json({ ok: false, message: "That unsubscribe link is not valid." }, 400);
   const row = await c.env.DB.prepare("SELECT id, email FROM subscribers WHERE token = ?").bind(token).first<{
     id: string;
     email: string;
