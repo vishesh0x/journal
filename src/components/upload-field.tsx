@@ -38,7 +38,7 @@ export function UploadField({
 
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+      <p className="text-sm font-bold  text-muted-foreground">{label}</p>
 
       <div
         onDragOver={(e) => {
@@ -64,7 +64,7 @@ export function UploadField({
         {value ? (
           <>
             <img src={value} alt={`${label} preview`} className="absolute inset-0 size-full object-cover" />
-            <div className="absolute inset-0 grid place-items-center bg-foreground/60 text-xs font-bold uppercase tracking-[0.18em] text-background opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="absolute inset-0 grid place-items-center bg-foreground/70 text-xs font-bold  text-background opacity-0 transition-opacity group-hover:opacity-100">
               {busy ? "Uploading…" : "Replace image"}
             </div>
           </>

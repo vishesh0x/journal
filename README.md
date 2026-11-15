@@ -377,3 +377,14 @@ What was actually implemented:
     common scraping method; it isn't cryptographic security, and a
     scraper specifically targeting this site's code could still reverse
     it — the same tradeoff every such"contact obfuscation" approach makes.
+
+## Design system (rebuild)
+
+The frontend was rebuilt with Hallmark (custom run) from the PencilBooth, Fold and Bento references.
+
+- `src/tokens.css`: every colour, face, size and radius (light and `.dark`). Nothing is hard-coded below it.
+- `src/styles.css`: the Hallmark stamp, waivers, and component classes (`.tile`, `.btn`, `.chip`, `.field`, `.row-2`, `.prose-journal`).
+- Type: Paper Mono (OFL) self-hosted from `public/fonts/`, variable weight. Body uses the duospace and narrow-space features (`ss02`, `ss03`), code uses ligatures and the slashed zero (`ss01`, `zero`), lead text uses the single-story a (`cv01`).
+- The old terracotta accent `#c4633c` is treated as unset; any other accent saved in Settings still drives links and the active nav state.
+- Static pages no longer render their `eyebrow` field (Hallmark bans eyebrows); it is still editable.
+- Local dev needs a `.dev.vars` file with `SESSION_SECRET=...` (not included).

@@ -53,7 +53,7 @@ export default function TagsManager() {
             placeholder="Short description (optional)"
             className="w-full flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
           />
-          <button className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
+          <button className="btn">
             Add
           </button>
         </form>
@@ -69,7 +69,7 @@ export default function TagsManager() {
                   <p className="text-sm font-medium">{tag.name}</p>
                   <p className="text-xs text-muted-foreground">
                     /tags/{tag.slug}
-                    {tag.description ? ` · ${tag.description}` : ""}
+                    {tag.description ? `, ${tag.description}` : ""}
                   </p>
                 </div>
                 <button

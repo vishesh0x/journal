@@ -51,7 +51,7 @@ export default function Home() {
   if (!data) {
     return (
       <SiteShell>
-        <div className="mx-auto w-full max-w-6xl px-5 pt-6 sm:px-6 sm:pt-12">
+        <div className="container">
           <FeaturedPostSkeleton />
           <PostListSkeleton />
         </div>
@@ -66,74 +66,66 @@ export default function Home() {
 
   return (
     <SiteShell>
-      <div className="mx-auto w-full max-w-6xl px-5 sm:px-6">
-        <section className="pb-16 pt-6 sm:pb-28 sm:pt-12">
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary">{settings?.author_name}</p>
-          <h1 className="mt-5 max-w-5xl break-words font-display text-3xl font-bold leading-[1.05] tracking-tighter sm:mt-6 sm:text-6xl lg:text-7xl">
-            {settings?.tagline}
-          </h1>
-          {settings?.author_bio ? (
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:mt-8 sm:text-lg">
-              {settings.author_bio}
-            </p>
-          ) : null}
+      <div className="container">
+        {/* hero: the tagline set as the broadsheet's masthead, the bio and the way in on the right */}
+        <section className="row-2 hero-row hero-fill">
+          <h1 className="display">{settings?.tagline}</h1>
+          <div className="flex flex-col gap-6">
+            {settings?.author_bio ? <p className="lead line-clamp-4">{settings.author_bio}</p> : null}
+            {settings?.author_name ? <p className="font-bold">{settings.author_name}</p> : null}
+            <div className="flex flex-wrap gap-3">
+              {lead ? (
+                <Link to={`/posts/${lead.slug}`} className="btn">
+                  Read the latest
+                </Link>
+              ) : null}
+              <Link to="/archive" className="btn-ghost">
+                Browse the archive
+              </Link>
+            </div>
+          </div>
         </section>
 
         {data.posts.length === 0 ? (
-          <p className="border-t border-border py-24 text-center text-muted-foreground">No posts published yet.</p>
+          <p className="band muted">No posts published yet.</p>
         ) : (
           <>
             {showLead && lead ? (
-              <section className="pb-16 sm:pb-32">
-                <div className="grid grid-cols-12 items-end gap-6">
-                  <div className="relative z-0 col-span-12 lg:col-span-7">
-                    {lead.cover_url ? (
-                      <Link to={`/posts/${lead.slug}`} className="block aspect-video w-full overflow-hidden">
-                        <img
-                          src={optimizedImageUrl(lead.cover_url, { width: 1200 }, settings?.image_resizing_enabled) ?? undefined}
-                          alt={lead.title}
-                          className="size-full object-cover grayscale transition-all duration-700 ease-out hover:grayscale-0"
-                          fetchPriority="high"
-                        />
-                      </Link>
-                    ) : (
-                      <div className="aspect-video w-full bg-surface" />
-                    )}
-                  </div>
-                  <div className="relative z-10 col-span-12 border-primary/20 bg-background p-6 sm:p-8 lg:col-span-5 lg:col-start-8 lg:-ml-24 lg:mb-16 lg:border-l lg:border-t lg:p-12">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary">Latest</p>
-                    <h2 className="mt-4 break-words font-display text-2xl font-bold leading-tight tracking-tight sm:mt-5 sm:text-3xl">
-                      <Link to={`/posts/${lead.slug}`} className="transition-colors hover:text-primary">
-                        {lead.title}
-                      </Link>
-                    </h2>
-                    {lead.subtitle || lead.excerpt ? (
-                      <p className="mt-4 leading-relaxed text-muted-foreground sm:mt-5">
-                        {lead.subtitle || lead.excerpt}
-                      </p>
-                    ) : null}
-                    <p className="mt-5 text-xs font-medium text-muted-foreground sm:mt-6">
-                      {formatDate(lead.published_at)} · {lead.reading_minutes} min read
-                    </p>
-                    <Link
-                      to={`/posts/${lead.slug}`}
-                      className="mt-7 inline-block border-b-2 border-primary pb-1 text-[11px] font-bold uppercase tracking-[0.18em] transition-colors hover:text-primary sm:mt-8"
-                    >
-                      Read full piece
+              <section className="band-flush row-2 wide-left" style={{ alignItems: "stretch" }}>
+                {lead.cover_url ? (
+                  <Link to={`/posts/${lead.slug}`} tabIndex={-1} aria-hidden className="block">
+                    <img
+                      src={optimizedImageUrl(lead.cover_url, { width: 1200 }, settings?.image_resizing_enabled) ?? undefined}
+                      alt=""
+                      className="cover"
+                      style={{ height: "100%", aspectRatio: "auto", minHeight: "20rem" }}
+                      fetchPriority="high"
+                    />
+                  </Link>
+                ) : null}
+                <article
+                  className="tile tile-link tone-b flex flex-col gap-5"
+                  style={lead.cover_url ? undefined : { gridColumn: "1 / -1" }}
+                >
+                  <h2 className="h-section">
+                    <Link to={`/posts/${lead.slug}`} className="stretch">
+                      {lead.title}
                     </Link>
-                  </div>
-                </div>
+                  </h2>
+                  {lead.subtitle || lead.excerpt ? <p className="muted">{lead.subtitle || lead.excerpt}</p> : null}
+                  <p className="small mt-auto">
+                    <time dateTime={lead.published_at ?? undefined}>{formatDate(lead.published_at)}</time>
+                    <br />
+                    {lead.reading_minutes} min read
+                  </p>
+                </article>
               </section>
             ) : null}
 
             {indexPosts.length ? (
-              <section className="grid grid-cols-12 gap-6 border-t border-border pt-10 sm:gap-8 sm:pt-16">
-                <div className="col-span-12 lg:col-span-4">
-                  <h2 className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground lg:sticky lg:top-28">
-                    More writing
-                  </h2>
-                </div>
-                <div className="col-span-12 lg:col-span-8">
+              <section className="band row-2">
+                <h2 className="h-section sticky-head">More writing</h2>
+                <div className="tile-grid">
                   {indexPosts.map((post) => (
                     <PostCard key={post.id} post={post} />
                   ))}
@@ -142,25 +134,19 @@ export default function Home() {
             ) : null}
 
             {totalPages > 1 ? (
-              <nav className="mt-12 flex items-center justify-between border-t border-border pt-8 text-[11px] font-bold uppercase tracking-[0.18em] sm:mt-16">
+              <nav aria-label="Pagination" className="band-flush flex items-center justify-between gap-4">
                 {page > 1 ? (
-                  <button
-                    onClick={() => setPage((p) => p - 1)}
-                    className="text-muted-foreground transition-colors hover:text-primary"
-                  >
+                  <button type="button" onClick={() => setPage((p) => p - 1)} className="btn-ghost">
                     Newer
                   </button>
                 ) : (
                   <span />
                 )}
-                <span className="text-muted-foreground">
-                  {page} / {totalPages}
+                <span className="small">
+                  Page {page} of {totalPages}
                 </span>
                 {page < totalPages ? (
-                  <button
-                    onClick={() => setPage((p) => p + 1)}
-                    className="text-muted-foreground transition-colors hover:text-primary"
-                  >
+                  <button type="button" onClick={() => setPage((p) => p + 1)} className="btn-ghost">
                     Older
                   </button>
                 ) : (
@@ -172,11 +158,8 @@ export default function Home() {
         )}
 
         {settings?.newsletter_enabled ? (
-          <div className="mt-16 sm:mt-32">
-            <Newsletter
-              headline={settings.newsletter_headline}
-              blurb={settings.newsletter_blurb}
-            />
+          <div className="band-flush" style={{ marginTop: "var(--section-gap-s)" }}>
+            <Newsletter headline={settings.newsletter_headline} blurb={settings.newsletter_blurb} />
           </div>
         ) : null}
       </div>

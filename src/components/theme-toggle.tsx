@@ -22,13 +22,8 @@ export function ThemeToggle({ defaultMode = "system" }: { defaultMode?: "system"
   }
 
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-label="Switch between light and dark"
-      className="grid size-9 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-    >
-      <span className="text-sm">{dark ? "☾" : "☀"}</span>
+    <button type="button" onClick={toggle} aria-pressed={dark} className="nav-btn">
+      {dark ? "Light" : "Dark"}
     </button>
   );
 }

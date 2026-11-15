@@ -24,7 +24,7 @@ type Draft = {
 
 const field =
   "w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-primary";
-const label = "text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground";
+const label = "text-sm font-bold  text-muted-foreground";
 
 export default function PageEditor() {
   const { id } = useParams<{ id: string }>();
@@ -98,16 +98,16 @@ export default function PageEditor() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link
             to="/dashboard/pages"
-            className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground hover:text-primary"
+            className="text-sm font-bold  text-muted-foreground hover:text-primary"
           >
-            ← All pages
+            All pages
           </Link>
           <div className="flex items-center gap-3">
             {saved ? <span className="text-xs text-primary">Saved</span> : null}
             <button
               onClick={() => save.mutate({})}
               disabled={save.isPending}
-              className="rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors hover:border-primary disabled:opacity-60"
+              className="btn-ghost"
             >
               {save.isPending ? "Saving…" : "Save"}
             </button>
@@ -127,7 +127,7 @@ export default function PageEditor() {
                   set({ status: "published" });
                   save.mutate({ status: "published" });
                 }}
-                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+                className="btn"
               >
                 Publish
               </button>
@@ -187,7 +187,7 @@ export default function PageEditor() {
                 />
                 <p className="mt-1.5 text-xs text-muted-foreground">
                   {pagePath(draft.slug || "page")}
-                  {isSystem ? " · built-in address, can't change" : ""}
+                  {isSystem ? ", built-in address, can't change" : ""}
                 </p>
               </div>
               <label className="flex items-center gap-2 text-sm">

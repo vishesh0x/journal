@@ -1,0 +1,129 @@
+@font-face {
+  font-family: "Paper Mono";
+  src: url("/fonts/PaperMono-VF.woff2") format("woff2");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+@theme static {
+  /* type scale (Hallmark scale, tuned to the broadsheet: big heads, calm body) */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5625rem;
+  --text-2xl: 1.953rem;
+  --text-3xl: 2.441rem;
+  --text-display-s: clamp(2rem, 3vw + 0.75rem, 3.5rem);
+  --text-display: clamp(2.25rem, 3.8vw + 0.75rem, 4.75rem);
+  --text-section: clamp(2.25rem, 2vw + 1.25rem, 3.25rem);
+  --text-title: clamp(1.375rem, 0.8vw + 1rem, 1.75rem);
+  --text-lead: clamp(1.125rem, 0.35vw + 1rem, 1.375rem);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* status */
+  --color-error: oklch(48% 0.19 27);
+  --color-success: oklch(45% 0.12 150);
+
+  /* ground and ink: Fold's fog and midnight navy, tinted never absolute */
+  --color-paper: oklch(95.6% 0.008 275);
+  --color-paper-2: oklch(98.6% 0.004 275);
+  --color-paper-3: oklch(91% 0.012 275);
+  --color-ink: oklch(30% 0.07 272);
+  --color-ink-2: oklch(44% 0.05 272);
+  --color-muted: oklch(50% 0.04 272);
+  --color-rule: oklch(84% 0.015 275);
+
+  /* the one loud action (Bento lime) and the one state colour (PencilBooth deep navy) */
+  --color-accent: oklch(90% 0.2 118);
+  --color-accent-ink: oklch(22% 0.06 272);
+  --color-signal: oklch(34% 0.19 268);
+  --color-signal-ink: oklch(97% 0.01 275);
+  --color-focus: oklch(50% 0.2 262);
+
+  /* the bento tray: tile fills, each with its own ink */
+  --color-tile-a: oklch(86% 0.07 330);
+  --color-tile-a-ink: oklch(24% 0.06 330);
+  --color-tile-b: oklch(48% 0.19 262);
+  --color-tile-b-ink: oklch(97% 0.01 262);
+  --color-tile-c: oklch(77% 0.13 85);
+  --color-tile-c-ink: oklch(24% 0.06 85);
+  --color-tile-d: oklch(34% 0.13 18);
+  --color-tile-d-ink: oklch(96% 0.015 18);
+  --color-tile-e: oklch(36% 0.08 148);
+  --color-tile-e-ink: oklch(96% 0.015 148);
+
+  --font-display: var(--font-body);
+  --font-body: "Paper Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-outlier: var(--font-body);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-outlier);
+
+  --radius-card: 32px;
+  --radius-panel: 12px;
+  --radius-input: 8px;
+  --radius-pill: 999px;
+  --shadow-card: none;
+  --shadow-nav: 0 6px 16px oklch(30% 0.07 272 / 0.12);
+  --tracking-display: -0.07em;
+  --outline: 2px;
+}
+
+:root {
+  --space-3xs: 2px;
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
+  --space-2xl: 64px;
+  --space-3xl: 96px;
+  --space-4xl: 144px;
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long: 420ms;
+  --container: 1280px;
+  --gutter: 64px;
+  --gap-columns: 32px;
+  --section-gap-s: 120px;
+  --section-gap: 144px;
+  --section-gap-l: 176px;
+  --z-base: 1;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-sticky-nav: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+  --rule-hair: 1px;
+
+  /* wiring: the owner's accent setting still lands on --primary (links and the active state) */
+  --primary: var(--color-signal);
+  color-scheme: light dark;
+}
+
+@media (max-width: 60rem) { :root { --gutter: 24px; --section-gap-s: 80px; --section-gap: 96px; --section-gap-l: 120px; } }
+@media (max-width: 40rem) { :root { --gutter: 16px; --section-gap-s: 56px; --section-gap: 72px; --section-gap-l: 96px; --gap-columns: 16px; } }
+
+/* dark: a second designed rendering, same hues, lighter surfaces step up, no shadows */
+.dark {
+  --color-paper: oklch(19% 0.04 272);
+  --color-paper-2: oklch(23% 0.045 272);
+  --color-paper-3: oklch(28% 0.05 272);
+  --color-ink: oklch(94% 0.012 275);
+  --color-ink-2: oklch(80% 0.03 275);
+  --color-muted: oklch(72% 0.03 275);
+  --color-rule: oklch(34% 0.045 272);
+  --color-accent: oklch(88% 0.17 118);
+  --color-signal: oklch(78% 0.13 268);
+  --color-signal-ink: oklch(20% 0.05 268);
+  --color-focus: oklch(78% 0.13 262);
+  --color-error: oklch(70% 0.16 27);
+  --color-success: oklch(75% 0.12 150);
+  --shadow-nav: none;
+  --primary: var(--color-signal);
+}

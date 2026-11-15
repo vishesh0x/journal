@@ -25,7 +25,7 @@ type Draft = {
 
 const fieldClass =
   "mt-1.5 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-primary";
-const labelClass = "block text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground";
+const labelClass = "block text-sm font-bold  text-muted-foreground";
 const cardClass = "rounded-lg border border-border bg-card p-5 sm:p-6";
 
 type ToolbarAction = { label: string; title: string; before: string; after?: string; block?: boolean };
@@ -38,8 +38,8 @@ const toolbar: ToolbarAction[] = [
   { label: "•", title: "List", before: "- ", block: true },
   { label: "1.", title: "Numbered list", before: "1. ", block: true },
   { label: "</>", title: "Code", before: "`", after: "`" },
-  { label: "🔗", title: "Link", before: "[", after: "](https://)" },
-  { label: "―", title: "Divider", before: "\n---\n", block: true },
+  { label: "Link", title: "Link", before: "[", after: "](https://)" },
+  { label: "Rule", title: "Divider", before: "\n---\n", block: true },
 ];
 
 export default function PostEditor() {
@@ -141,17 +141,17 @@ export default function PostEditor() {
   return (
     <DashboardShell>
       <div className="mx-auto w-full max-w-7xl px-5 pb-16 sm:px-6">
-        <div className="sticky top-0 z-30 -mx-5 mb-6 border-b border-border bg-background/90 px-5 py-4 backdrop-blur sm:-mx-6 sm:px-6">
+        <div className="sticky top-0 z-30 -mx-5 mb-6 border-b border-border bg-background px-5 py-4 sm:-mx-6 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-4">
               <Link
                 to="/dashboard"
-                className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-primary"
+                className="text-sm font-bold  text-muted-foreground transition-colors hover:text-primary"
               >
-                ← All posts
+                All posts
               </Link>
               <span
-                className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold capitalize ${
+                className={`rounded-full border px-2.5 py-0.5 text-sm font-semibold capitalize ${
                   isPublished ? "border-primary/40 text-primary" : "border-border text-muted-foreground"
                 }`}
               >
@@ -161,12 +161,12 @@ export default function PostEditor() {
             <div className="flex flex-wrap items-center gap-3">
               {status ? <span className="text-xs font-semibold text-primary">{status}</span> : null}
               <span className="hidden text-xs text-muted-foreground sm:inline">
-                {words} words · {Math.max(1, Math.round(words / 200))} min
+                {words} words, about {Math.max(1, Math.round(words / 200))} min
               </span>
               <button
                 onClick={() => save.mutate({})}
                 disabled={save.isPending}
-                className="rounded-md border border-border px-4 py-2 text-sm font-semibold transition-colors hover:border-primary disabled:opacity-60"
+                className="btn-ghost"
               >
                 {save.isPending ? "Saving…" : "Save"}
               </button>
@@ -180,7 +180,7 @@ export default function PostEditor() {
               ) : (
                 <button
                   onClick={() => save.mutate({ status: "published" })}
-                  className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                  className="btn"
                 >
                   Publish
                 </button>
@@ -311,7 +311,7 @@ export default function PostEditor() {
             {showPreview ? (
               <div className="lg:sticky lg:top-28 lg:h-fit">
                 <div className="overflow-hidden rounded-lg border border-border bg-card">
-                  <p className="border-b border-border px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                  <p className="border-b border-border px-6 py-3 text-sm font-bold  text-muted-foreground">
                     Live preview
                   </p>
                   <div className="max-h-[72vh] overflow-auto p-6">
@@ -427,7 +427,7 @@ export default function PostEditor() {
               <div className="rounded-lg border border-border bg-card p-5">
                 <p className={labelClass}>Google preview</p>
                 <p className="mt-3 truncate text-xs text-muted-foreground">yoursite.com › posts › {form.slug}</p>
-                <p className="mt-1 text-lg leading-snug text-[#1a0dab] dark:text-[#8ab4f8]">
+                <p className="mt-1 text-lg leading-snug text-primary">
                   {form.meta_title || form.title}
                 </p>
                 <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">

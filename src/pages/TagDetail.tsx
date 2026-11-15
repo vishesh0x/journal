@@ -24,31 +24,25 @@ export default function TagDetail() {
     );
   }
 
+  const total = data?.total ?? 0;
+
   return (
     <SiteShell>
-      <div className="mx-auto w-full max-w-6xl px-5 sm:px-6">
-        <header className="max-w-3xl pb-12 sm:pb-16">
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary">Topic</p>
-          <h1 className="mt-5 break-words font-display text-4xl font-bold leading-[1.02] tracking-tighter sm:text-6xl lg:text-7xl">
-            {data?.tag?.name ?? slug}
-          </h1>
-          {data?.tag?.description ? (
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-              {data.tag.description}
+      <div className="container">
+        <header className="row-2 hero-row" style={{ paddingBottom: "var(--space-xl)" }}>
+          <h1 className="display">{data?.tag?.name ?? slug}</h1>
+          <div className="flex flex-col gap-4">
+            {data?.tag?.description ? <p className="lead">{data.tag.description}</p> : null}
+            <p className="small">
+              {total} {total === 1 ? "piece" : "pieces"}
             </p>
-          ) : null}
-          <p className="mt-6 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
-            {data?.total ?? 0} {(data?.total ?? 0) === 1 ? "piece" : "pieces"}
-          </p>
+          </div>
         </header>
         {data && data.posts.length === 0 ? (
-          <p className="border-t border-border py-24 text-center text-muted-foreground">Nothing here yet.</p>
+          <p className="band muted">Nothing here yet.</p>
         ) : (
-          <section className="grid grid-cols-12 gap-6 border-t border-border pt-10 sm:gap-8 sm:pt-14">
-            <div className="col-span-12 lg:col-span-4" />
-            <div className="col-span-12 lg:col-span-8">
-              {data?.posts.map((post) => <PostCard key={post.id} post={post} />)}
-            </div>
+          <section className="band-flush">
+            <div className="tile-grid">{data?.posts.map((post) => <PostCard key={post.id} post={post} />)}</div>
           </section>
         )}
       </div>

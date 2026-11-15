@@ -42,7 +42,7 @@ export default function PagesList() {
           <button
             onClick={() => create.mutate()}
             disabled={create.isPending}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+            className="btn"
           >
             {create.isPending ? "Creating…" : "New page"}
           </button>
@@ -66,7 +66,7 @@ export default function PagesList() {
                     </button>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {pagePath(page.slug)}
-                      {page.system_key ? " · built in" : ""}
+                      {page.system_key ? ", built in" : ""}
                     </p>
                   </div>
                   <span

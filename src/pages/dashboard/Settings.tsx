@@ -6,7 +6,7 @@ import { api, SOCIAL_PLATFORMS, type SiteSettings } from "@/lib/api";
 
 const fieldClass =
   "mt-1.5 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary";
-const labelClass = "block text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground";
+const labelClass = "block text-xs font-medium  text-muted-foreground";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -63,7 +63,7 @@ export default function Settings() {
             <button
               onClick={() => save.mutate()}
               disabled={save.isPending}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+              className="btn"
             >
               {save.isPending ? "Saving…" : "Save changes"}
             </button>
@@ -101,7 +101,7 @@ export default function Settings() {
                   <input
                     type="color"
                     className="h-10 w-20 cursor-pointer rounded-md border border-border bg-background p-1"
-                    value={/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(form.accent) ? form.accent : "#c4633c"}
+                    value={/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(form.accent) ? form.accent : "#20294c"}
                     onChange={(e) => set("accent")(e.target.value)}
                   />
                   <span className="text-xs text-muted-foreground">{form.accent}</span>
@@ -127,7 +127,7 @@ export default function Settings() {
                   <span className="mt-1 block text-xs text-muted-foreground">
                     Uses Cloudflare's Image Resizing to shrink and compress images on the fly — originals stay in
                     R2 untouched. Only turn this on after confirming Image Resizing is enabled for your domain
-                    (Cloudflare dashboard → your domain → Speed → Optimization) — it generally requires a real
+                    (in the Cloudflare dashboard: your domain, then Speed, then Optimization) — it generally requires a real
                     custom domain, not a *.workers.dev URL. Turning this on before that's set up will break every
                     image on the site.
                   </span>
@@ -255,7 +255,7 @@ export default function Settings() {
                 placeholder="<script>…</script>"
               />
               <p className="mt-1.5 text-xs text-muted-foreground">
-                Injected on every public page. Leave blank if you don't use analytics.
+                Injected on every public page. Leave blank if you don’t use analytics.
               </p>
             </div>
           </Section>

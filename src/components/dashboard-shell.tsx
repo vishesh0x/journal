@@ -5,15 +5,12 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "./theme-toggle";
 
-const navItem =
-  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-surface hover:text-foreground aria-[current=page]:bg-surface aria-[current=page]:text-foreground";
-
 const NAV = [
-  { to: "/dashboard", label: "Posts", glyph: "✎", end: true },
-  { to: "/dashboard/pages", label: "Pages", glyph: "▤" },
-  { to: "/dashboard/tags", label: "Topics", glyph: "#" },
-  { to: "/dashboard/subscribers", label: "Subscribers", glyph: "✉" },
-  { to: "/dashboard/settings", label: "Settings", glyph: "⚙" },
+  { to: "/dashboard", label: "Posts", end: true },
+  { to: "/dashboard/pages", label: "Pages" },
+  { to: "/dashboard/tags", label: "Topics" },
+  { to: "/dashboard/subscribers", label: "Subscribers" },
+  { to: "/dashboard/settings", label: "Settings" },
 ];
 
 export function DashboardShell({ children }: { children: ReactNode }) {
@@ -30,40 +27,29 @@ export function DashboardShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-background lg:grid lg:grid-cols-[248px_1fr]">
+    <div data-surface="app" className="min-h-screen bg-background lg:grid lg:grid-cols-[248px_minmax(0,1fr)]">
       <aside className="border-b border-border lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r">
         <div className="flex flex-col gap-6 px-5 py-6 lg:h-full">
           <div className="flex items-center justify-between">
-            <Link to="/" className="font-display text-xl font-bold tracking-tighter">
+            <Link to="/" className="wordmark text-2xl">
               Journal
             </Link>
             <ThemeToggle />
           </div>
 
-          <nav className="flex flex-wrap gap-1 lg:flex-col lg:flex-nowrap">
-            {NAV.map(({ to, label, glyph, end }) => (
-              <NavLink key={to} to={to} end={end} className={navItem}>
-                <span aria-hidden className="w-4 text-center text-xs text-primary">
-                  {glyph}
-                </span>
+          <nav aria-label="Dashboard" className="flex flex-wrap gap-1 lg:flex-col lg:flex-nowrap">
+            {NAV.map(({ to, label, end }) => (
+              <NavLink key={to} to={to} end={end} className="nav-link" style={{ textAlign: "left" }}>
                 {label}
               </NavLink>
             ))}
           </nav>
 
-          <div className="mt-auto flex flex-col gap-2 lg:flex">
-            <a
-              href="/"
-              target="_blank"
-              rel="noreferrer"
-              className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-primary"
-            >
-              View site ↗
+          <div className="mt-auto flex flex-col items-start gap-3">
+            <a href="/" target="_blank" rel="noreferrer" className="text-link">
+              View the site
             </a>
-            <button
-              onClick={signOut}
-              className="text-left text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-destructive"
-            >
+            <button type="button" onClick={signOut} className="btn-ghost">
               Sign out
             </button>
           </div>

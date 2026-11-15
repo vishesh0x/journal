@@ -57,7 +57,7 @@ export default function PostsList() {
           <button
             onClick={() => create.mutate()}
             disabled={create.isPending}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
+            className="btn"
           >
             {create.isPending ? "Creating…" : "New post"}
           </button>
@@ -67,7 +67,7 @@ export default function PostsList() {
           {stats.map((stat) => (
             <div key={stat.label} className="rounded-lg border border-border bg-surface px-4 py-4">
               <p className="font-display text-2xl sm:text-3xl">{stat.value}</p>
-              <p className="mt-0.5 text-xs uppercase tracking-[0.14em] text-muted-foreground">{stat.label}</p>
+              <p className="mt-0.5 text-xs  text-muted-foreground">{stat.label}</p>
             </div>
           ))}
         </div>
@@ -89,7 +89,7 @@ export default function PostsList() {
                       {post.title}
                     </button>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      /{post.slug} · updated {new Date(post.updated_at).toLocaleDateString()}
+                      /{post.slug}, updated {new Date(post.updated_at).toLocaleDateString()}
                     </p>
                   </div>
                   <span

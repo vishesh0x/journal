@@ -15,12 +15,6 @@ const SOCIAL_LABELS: Record<string, string> = {
   email: "Email",
 };
 
-const navLink =
-  "border-b-2 border-transparent pb-0.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-primary aria-[current=page]:border-primary aria-[current=page]:text-foreground";
-
-const metaLink =
-  "text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-primary";
-
 export function pagePath(slug: string) {
   if (slug === "privacy") return "/privacy";
   if (slug === "terms") return "/terms";
@@ -42,7 +36,10 @@ export function SiteShell({ children }: { children: ReactNode }) {
   const footerPages = (pages ?? []).filter((p) => p.show_in_footer);
 
   useEffect(() => {
-    if (settings?.accent) document.documentElement.style.setProperty("--primary", settings.accent);
+    // "#c4633c" is the old terracotta default; treat it as unset so the new navy signal shows
+    if (settings?.accent && settings.accent.toLowerCase() !== "#c4633c") {
+      document.documentElement.style.setProperty("--primary", settings.accent);
+    }
     if (settings?.favicon_url) {
       let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
       if (!link) {
@@ -75,124 +72,119 @@ export function SiteShell({ children }: { children: ReactNode }) {
     });
   }, [settings?.analytics_script]);
 
+  const closeMenu = () => setMenuOpen(false);
+
   const navItems = (
     <>
-      <NavLink to="/" end className={({ isActive }) => `${navLink} ${isActive ? "border-primary text-foreground" : ""}`}>
+      <NavLink to="/" end className="nav-link" onClick={closeMenu}>
         Writing
       </NavLink>
-      <NavLink to="/archive" className={({ isActive }) => `${navLink} ${isActive ? "border-primary text-foreground" : ""}`}>
+      <NavLink to="/archive" className="nav-link" onClick={closeMenu}>
         Archive
       </NavLink>
-      <NavLink to="/about" className={({ isActive }) => `${navLink} ${isActive ? "border-primary text-foreground" : ""}`}>
+      <NavLink to="/about" className="nav-link" onClick={closeMenu}>
         About
       </NavLink>
       {navPages.map((page) => (
-        <Link key={page.id} to={pagePath(page.slug)} className={navLink}>
+        <NavLink key={page.id} to={pagePath(page.slug)} className="nav-link" onClick={closeMenu}>
           {page.title}
-        </Link>
+        </NavLink>
       ))}
+      <NavLink to="/search" className="nav-link" onClick={closeMenu}>
+        Search
+      </NavLink>
     </>
   );
 
+  const siteName = settings?.site_name ?? "Journal";
+  const socials = SOCIAL_PLATFORMS.filter((key) => settings?.social_links?.[key]);
+
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="sticky top-0 z-40 bg-background/90 backdrop-blur">
-        <div className="mx-auto flex h-20 w-full max-w-6xl items-baseline justify-between gap-4 px-5 pt-6 sm:px-6">
-          <Link to="/" className="flex items-baseline gap-2.5 min-w-0">
-            {settings?.logo_url ? <img src={settings.logo_url} alt="" className="h-6 w-auto self-center" /> : null}
-            <span className="truncate font-display text-xl font-bold tracking-tighter sm:text-2xl">
-              {settings?.site_name ?? "Journal"}
-            </span>
-          </Link>
-
-          {/* Desktop nav */}
-          <nav className="hidden items-center gap-6 md:flex md:gap-9">
-            {navItems}
-            <Link
-              to="/search"
-              aria-label="Search"
-              className="text-muted-foreground transition-colors hover:text-primary"
-            >
-              ⌕
+    <div className="flex min-h-screen flex-col">
+      <header className="site-header">
+        <div className="container">
+          <div className="nav">
+            <Link to="/" className="nav-brand wordmark">
+              {settings?.logo_url ? <img src={settings.logo_url} alt="" /> : null}
+              <span>{siteName}</span>
             </Link>
-            <ThemeToggle defaultMode={settings?.theme_mode} />
-          </nav>
 
-          {/* Mobile controls */}
-          <div className="flex items-center gap-2 md:hidden">
-            <Link
-              to="/search"
-              aria-label="Search"
-              className="grid size-9 place-items-center text-lg text-muted-foreground transition-colors hover:text-primary"
-            >
-              ⌕
-            </Link>
-            <ThemeToggle defaultMode={settings?.theme_mode} />
-            <button
-              type="button"
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-label={menuOpen ? "Close menu" : "Open menu"}
-              className="grid size-9 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-            >
-              <span className="text-base leading-none">{menuOpen ? "✕" : "☰"}</span>
-            </button>
+            <nav aria-label="Main" className="nav-links">
+              {navItems}
+              <ThemeToggle defaultMode={settings?.theme_mode} />
+            </nav>
+
+            <div className="flex items-center gap-2 md:hidden">
+              <ThemeToggle defaultMode={settings?.theme_mode} />
+              <button
+                type="button"
+                className="nav-btn nav-menu-btn"
+                aria-expanded={menuOpen}
+                aria-controls="mobile-menu"
+                onClick={() => setMenuOpen((v) => !v)}
+              >
+                {menuOpen ? "Close" : "Menu"}
+              </button>
+            </div>
           </div>
-        </div>
 
-        {menuOpen && (
-          <nav className="flex flex-col gap-4 border-t border-border bg-background px-5 py-5 md:hidden">
-            {navItems}
-          </nav>
-        )}
+          {menuOpen ? (
+            <nav id="mobile-menu" aria-label="Mobile" className="nav nav-panel">
+              {navItems}
+            </nav>
+          ) : null}
+        </div>
       </header>
 
-      <main className="flex-1 pt-10 sm:pt-16">{children}</main>
+      <main className="page-main flex-1">{children}</main>
 
-      <footer className="mt-24 border-t border-border sm:mt-32">
-        <div className="mx-auto grid w-full max-w-6xl gap-10 px-5 py-14 sm:px-6 md:grid-cols-[1.5fr_1fr_1fr]">
-          <div>
-            <p className="font-display text-xl font-bold tracking-tighter">{settings?.site_name ?? "Journal"}</p>
-            <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
-              {settings?.description || settings?.tagline}
+      <footer className="site-footer">
+        <div className="container">
+          <div className="foot-grid">
+            <div>
+              <p className="wordmark mast">{siteName}</p>
+              {settings?.description || settings?.tagline ? (
+                <p className="muted mt-5 max-w-sm">{settings?.description || settings?.tagline}</p>
+              ) : null}
+            </div>
+            <div className="foot-col">
+              <h2>Elsewhere</h2>
+              {socials.length ? (
+                socials.map((key) => {
+                  const raw = settings!.social_links[key]!;
+                  const value = key === "email" ? decodeEmail(raw) : raw;
+                  const href = key === "email" ? (value.startsWith("mailto:") ? value : `mailto:${value}`) : value;
+                  return (
+                    <a key={key} href={href} target="_blank" rel="noreferrer" className="text-link">
+                      {SOCIAL_LABELS[key] ?? key}
+                    </a>
+                  );
+                })
+              ) : (
+                <span className="small">No links yet</span>
+              )}
+              <a href="/rss.xml" className="text-link">
+                RSS feed
+              </a>
+            </div>
+            <div className="foot-col">
+              <h2>Fine print</h2>
+              {footerPages.map((page) => (
+                <Link key={page.id} to={pagePath(page.slug)} className="text-link">
+                  {page.title}
+                </Link>
+              ))}
+              <Link to="/about" className="text-link">
+                About
+              </Link>
+            </div>
+          </div>
+          <div className="foot-end">
+            <p className="small">
+              {settings?.footer_text ||
+                `© ${new Date().getFullYear()} ${settings?.author_name || settings?.site_name || "Journal"}`}
             </p>
           </div>
-          <div className="flex flex-col gap-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary">Elsewhere</p>
-            {SOCIAL_PLATFORMS.some((key) => settings?.social_links?.[key]) ? (
-              SOCIAL_PLATFORMS.filter((key) => settings?.social_links?.[key]).map((key) => {
-                const raw = settings!.social_links[key]!;
-                const value = key === "email" ? decodeEmail(raw) : raw;
-                const href = key === "email" ? (value.startsWith("mailto:") ? value : `mailto:${value}`) : value;
-                return (
-                  <a key={key} href={href} target="_blank" rel="noreferrer" className={metaLink}>
-                    {SOCIAL_LABELS[key] ?? key}
-                  </a>
-                );
-              })
-            ) : (
-              <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">No links yet</span>
-            )}
-            <a href="/rss.xml" className={metaLink}>
-              RSS feed
-            </a>
-          </div>
-          <div className="flex flex-col gap-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary">Fine print</p>
-            {footerPages.map((page) => (
-              <Link key={page.id} to={pagePath(page.slug)} className={metaLink}>
-                {page.title}
-              </Link>
-            ))}
-            <Link to="/about" className={metaLink}>
-              About
-            </Link>
-          </div>
-        </div>
-        <div className="mx-auto w-full max-w-6xl border-t border-border px-5 py-6 sm:px-6">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            {settings?.footer_text ||
-              `© ${new Date().getFullYear()} ${settings?.author_name || settings?.site_name || "Journal"}`}
-          </p>
         </div>
       </footer>
     </div>

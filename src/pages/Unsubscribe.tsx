@@ -19,14 +19,14 @@ export default function Unsubscribe() {
   }, [token]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-5">
-      <div className="max-w-md text-center">
-        <h1 className="font-display text-3xl tracking-tight sm:text-4xl">Email preferences</h1>
-        <p className="mt-3 text-muted-foreground">{message}</p>
-        <a href="/" className="mt-6 inline-block text-primary underline underline-offset-2">
+    <main className="container flex min-h-screen items-center">
+      <div className="tile tone-c flex max-w-xl flex-col gap-5">
+        <h1 className="h-section">Email preferences</h1>
+        <p role="status">{message}</p>
+        <a href="/" className="btn self-start">
           Back to the journal
         </a>
       </div>
-    </div>
+    </main>
   );
 }

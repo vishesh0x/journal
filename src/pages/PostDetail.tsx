@@ -48,20 +48,14 @@ export default function PostDetail() {
   if (error || !data?.post) {
     return (
       <SiteShell>
-        <div className="mx-auto max-w-6xl px-5 py-24 sm:px-6 sm:py-32">
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary">Missing page</p>
-          <h1 className="mt-5 font-display text-4xl font-bold leading-[1.02] tracking-tighter sm:text-6xl lg:text-7xl">
-            No such piece.
-          </h1>
-          <p className="mt-6 max-w-md leading-relaxed text-muted-foreground">
-            That post doesn't exist or hasn't been published yet.
-          </p>
-          <Link
-            to="/"
-            className="mt-10 inline-block border-b-2 border-primary pb-1 text-[11px] font-bold uppercase tracking-[0.18em] transition-colors hover:text-primary"
-          >
-            Back to writing
-          </Link>
+        <div className="container">
+          <div className="tile tone-a flex max-w-2xl flex-col gap-5">
+            <h1 className="h-section">No such piece.</h1>
+            <p>That post doesn’t exist or hasn’t been published yet.</p>
+            <Link to="/" className="btn self-start">
+              Back to writing
+            </Link>
+          </div>
         </div>
       </SiteShell>
     );
@@ -70,29 +64,39 @@ export default function PostDetail() {
   const { post, more } = data;
   const toc = extractToc(post.content_md);
 
+  const tocList = (
+    <ul className="flex flex-col gap-3">
+      {toc.map((item) => (
+        <li key={item.id} className={item.depth === 3 ? "pl-4" : ""}>
+          <a href={`#${item.id}`} className="text-link break-words" style={{ textDecorationThickness: "1px" }}>
+            {item.text}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
     <SiteShell>
-      <article className="mx-auto w-full max-w-6xl px-5 sm:px-6">
-        <header className="max-w-4xl pb-10 sm:pb-12">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-bold uppercase tracking-[0.22em] text-primary">
-            {post.tags.map((tag) => (
-              <Link key={tag.slug} to={`/tags/${tag.slug}`} className="transition-opacity hover:opacity-70">
-                {tag.name}
-              </Link>
-            ))}
-          </div>
-          <h1 className="mt-5 break-words font-display text-3xl font-bold leading-[1.05] tracking-tighter sm:text-6xl lg:text-7xl">
-            {post.title}
-          </h1>
-          {post.subtitle ? (
-            <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-lg">
-              {post.subtitle}
+      <article className="container">
+        <header className="row-2 hero-row" style={{ paddingBottom: "var(--space-xl)" }}>
+          <h1 className="display-s">{post.title}</h1>
+          <div className="flex flex-col gap-5">
+            {post.subtitle ? <p className="lead">{post.subtitle}</p> : null}
+            <p className="small">
+              <time dateTime={post.published_at ?? undefined}>{formatDate(post.published_at)}</time>
+              <br />
+              {post.reading_minutes} min read
             </p>
-          ) : null}
-          <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-muted-foreground sm:mt-8">
-            <time dateTime={post.published_at ?? undefined}>{formatDate(post.published_at)}</time>
-            <span aria-hidden>·</span>
-            <span>{post.reading_minutes} min read</span>
+            {post.tags.length ? (
+              <div className="chips">
+                {post.tags.map((tag) => (
+                  <Link key={tag.slug} to={`/tags/${tag.slug}`} className="chip">
+                    {tag.name}
+                  </Link>
+                ))}
+              </div>
+            ) : null}
           </div>
         </header>
 
@@ -100,86 +104,57 @@ export default function PostDetail() {
           <img
             src={optimizedImageUrl(post.cover_url, { width: 1600 }, settings?.image_resizing_enabled) ?? undefined}
             alt={post.title}
-            className="aspect-video w-full object-cover"
+            className="cover"
             fetchPriority="high"
           />
         ) : null}
 
-        <div className="grid min-w-0 gap-8 py-10 sm:py-16 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start lg:gap-12">
+        <div className="row-2 band-flush">
           {toc.length > 2 ? (
             <>
-              {/* Mobile / tablet: collapsed by default so it doesn't compete with the article */}
-              <details className="group rounded-lg border border-border lg:hidden">
-                <summary className="flex cursor-pointer select-none list-none items-center justify-between px-4 py-3 text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground marker:content-none">
-                  Contents
-                  <span className="text-sm transition-transform duration-200 group-open:rotate-180" aria-hidden>
-                    ⌄
-                  </span>
-                </summary>
-                <ul className="flex flex-col gap-2.5 border-t border-border px-4 py-3 text-sm">
-                  {toc.map((item) => (
-                    <li key={item.id} className={item.depth === 3 ? "pl-3" : ""}>
-                      <a href={`#${item.id}`} className="break-words text-muted-foreground transition-colors hover:text-primary">
-                        {item.text}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+              <details className="tile lg:hidden" style={{ padding: "var(--space-md)" }}>
+                <summary className="cursor-pointer font-bold">Contents</summary>
+                <div className="mt-4">{tocList}</div>
               </details>
-              {/* Desktop: sticky sidebar alongside the article */}
-              <aside className="hidden lg:sticky lg:top-28 lg:block">
-                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">Contents</p>
-                <ul className="mt-4 space-y-2.5 text-sm">
-                  {toc.map((item) => (
-                    <li key={item.id} className={item.depth === 3 ? "pl-3" : ""}>
-                      <a href={`#${item.id}`} className="break-words text-muted-foreground transition-colors hover:text-primary">
-                        {item.text}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+              <aside className="sticky-head hidden lg:block" aria-label="Contents">
+                <h2 className="h-title mb-5">Contents</h2>
+                {tocList}
               </aside>
             </>
           ) : (
             <div className="hidden lg:block" />
           )}
-          <div className="w-full min-w-0 max-w-[68ch]">
+          <div className="w-full min-w-0" style={{ maxWidth: "68ch" }}>
             <MarkdownContent markdown={post.content_md} />
           </div>
         </div>
 
-        <section className="flex flex-col gap-5 border-t border-border py-8 sm:flex-row sm:items-center sm:py-10">
-          {settings?.author_avatar_url ? (
-            <img
-              src={optimizedImageUrl(settings.author_avatar_url, { width: 128 }, settings.image_resizing_enabled) ?? undefined}
-              alt={settings.author_name}
-              className="size-16 object-cover"
-              loading="lazy"
-              decoding="async"
-            />
-          ) : null}
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary">Written by</p>
-            <p className="mt-2 font-display text-xl font-bold tracking-tight">{settings?.author_name}</p>
-            <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted-foreground">{settings?.author_bio}</p>
+        <section className="band-flush tile tone-c row-2 wide-left" style={{ alignItems: "center", padding: "var(--space-xl)", marginTop: "var(--section-gap-s)" }}>
+          <div className="flex items-center gap-5">
+            {settings?.author_avatar_url ? (
+              <img
+                src={optimizedImageUrl(settings.author_avatar_url, { width: 128 }, settings.image_resizing_enabled) ?? undefined}
+                alt=""
+                className="avatar"
+                loading="lazy"
+                decoding="async"
+              />
+            ) : null}
+            <h2 className="h-title">Written by {settings?.author_name}</h2>
           </div>
+          {settings?.author_bio ? <p className="lead" style={{ color: "inherit" }}>{settings.author_bio}</p> : null}
         </section>
 
         {more.length ? (
-          <section className="grid grid-cols-12 gap-6 border-t border-border py-10 sm:gap-8 sm:py-14">
-            <p className="col-span-12 text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground lg:col-span-4">
-              Keep reading
-            </p>
-            <ul className="col-span-12 divide-y divide-border lg:col-span-8">
+          <section className="band row-2">
+            <h2 className="h-section sticky-head">Keep reading</h2>
+            <ul className="rows">
               {more.map((item) => (
-                <li key={item.id} className="group py-5 first:pt-0">
-                  <Link
-                    to={`/posts/${item.slug}`}
-                    className="font-display text-lg font-bold leading-snug tracking-tight transition-colors group-hover:text-primary sm:text-xl"
-                  >
+                <li key={item.id}>
+                  <Link to={`/posts/${item.slug}`} className="h-title">
                     {item.title}
                   </Link>
-                  <p className="mt-1.5 text-xs font-medium text-muted-foreground">{item.reading_minutes} min read</p>
+                  <span className="small">{item.reading_minutes} min read</span>
                 </li>
               ))}
             </ul>
@@ -187,7 +162,7 @@ export default function PostDetail() {
         ) : null}
 
         {settings?.newsletter_enabled ? (
-          <div className="my-8 sm:my-10">
+          <div className="band-flush" style={{ marginTop: "var(--section-gap-s)" }}>
             <Newsletter headline={settings.newsletter_headline} blurb={settings.newsletter_blurb} />
           </div>
         ) : null}
