@@ -6,10 +6,13 @@ import { Icon, PageHead } from "@/components/dash";
 import { DropArea, useMediaList, useUploadMedia } from "@/components/media-picker";
 import { api } from "@/lib/api";
 import { formatBytes, type MediaItem } from "@/lib/media";
+import { useResizing } from "@/lib/use-resizing";
+import { optimizedImageUrl } from "@/lib/image";
 
 export default function Media() {
   const queryClient = useQueryClient();
   const list = useMediaList();
+  const resizing = useResizing();
   const upload = useUploadMedia();
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +86,7 @@ export default function Media() {
             {items.map((item) => (
               <li key={item.key} className="media-card">
                 <span className="media-thumb">
-                  <img src={item.url} alt="" loading="lazy" decoding="async" />
+                  <img src={optimizedImageUrl(item.url, { width: 320 }, resizing) ?? item.url} alt="" loading="lazy" decoding="async" width={320} height={320} />
                 </span>
                 <div className="media-info">
                   <p className="media-name" title={item.name}>

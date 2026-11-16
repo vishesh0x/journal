@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ImagePlus, Images, Loader, Upload, X } from "lucide-react";
 import { api } from "@/lib/api";
+import { useResizing } from "@/lib/use-resizing";
+import { optimizedImageUrl } from "@/lib/image";
 import { formatBytes, type MediaItem, type MediaList } from "@/lib/media";
 
 const PAGE = 48;
@@ -77,13 +79,14 @@ export function DropArea({ onFiles, busy, multiple = false }: { onFiles: (files:
 }
 
 export function MediaGrid({ items, onPick }: { items: MediaItem[]; onPick: (item: MediaItem) => void }) {
+  const resizing = useResizing();
   return (
     <ul className="media-grid">
       {items.map((item) => (
         <li key={item.key}>
           <button type="button" className="media-tile" onClick={() => onPick(item)} title={item.name}>
             <span className="media-thumb">
-              <img src={item.url} alt="" loading="lazy" decoding="async" />
+              <img src={optimizedImageUrl(item.url, { width: 320 }, resizing) ?? item.url} alt="" loading="lazy" decoding="async" width={320} height={320} />
             </span>
             <span className="media-name">{item.name}</span>
             <span className="small">{formatBytes(item.size)}</span>

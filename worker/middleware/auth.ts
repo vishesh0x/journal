@@ -13,9 +13,16 @@ export const attachSession = createMiddleware<AppEnv>(async (c, next) => {
   if (token) {
     try {
       const payload = await verify(token, c.env.SESSION_SECRET, "HS256");
-      if (typeof payload.sub === "string") {
-        c.set("userId", payload.sub);
-        c.set("isAdmin", payload.isAdmin === true);
+      if (typeof payload.sub === "string" && typeof payload.ep === "number") {
+        // The token only proves it was issued by us. The database decides whether it is still good:
+        // the user must exist and the token's epoch must match, so sign-out revokes it everywhere.
+        const user = await c.env.DB.prepare("SELECT is_admin, session_epoch FROM users WHERE id = ?")
+          .bind(payload.sub)
+          .first<{ is_admin: number; session_epoch: number }>();
+        if (user && user.session_epoch === payload.ep) {
+          c.set("userId", payload.sub);
+          c.set("isAdmin", user.is_admin === 1);
+        }
       }
     } catch {
       // invalid/expired token — treat as logged out

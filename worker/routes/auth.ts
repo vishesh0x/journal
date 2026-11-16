@@ -12,9 +12,9 @@ const app = new Hono<AppEnv>();
 
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
-async function setSessionCookie(c: Context<AppEnv>, userId: string, isAdmin: boolean) {
+async function setSessionCookie(c: Context<AppEnv>, userId: string, isAdmin: boolean, epoch: number) {
   const iat = Math.floor(Date.now() / 1000);
-  const token = await sign({ sub: userId, isAdmin, iat, exp: iat + SESSION_TTL_SECONDS }, c.env.SESSION_SECRET, "HS256");
+  const token = await sign({ sub: userId, isAdmin, ep: epoch, iat, exp: iat + SESSION_TTL_SECONDS }, c.env.SESSION_SECRET, "HS256");
   setCookie(c, SESSION_COOKIE, token, {
     httpOnly: true,
     secure: true,
@@ -59,7 +59,7 @@ app.post("/register", async (c) => {
     console.error(err);
     return c.json({ error: "Registration is closed. This site already has an owner." }, 403);
   }
-  await setSessionCookie(c, id, true);
+  await setSessionCookie(c, id, true, 0);
   return c.json({ ok: true, isAdmin: true });
 });
 
@@ -76,17 +76,20 @@ app.post("/login", async (c) => {
     c.header("Retry-After", String(Math.max(byIp.retryAfter, byEmail.retryAfter)));
     throw new HttpError(429, "Too many sign-in attempts. Wait a few minutes and try again.");
   }
-  const row = await c.env.DB.prepare("SELECT id, password_hash, is_admin FROM users WHERE email = ?")
+  const row = await c.env.DB.prepare("SELECT id, password_hash, is_admin, session_epoch FROM users WHERE email = ?")
     .bind(normalised)
-    .first<{ id: string; password_hash: string; is_admin: number }>();
+    .first<{ id: string; password_hash: string; is_admin: number; session_epoch: number }>();
   const ok = await verifyPassword(password, row?.password_hash ?? DUMMY_HASH);
   if (!row || !ok) return c.json({ error: "Invalid email or password." }, 401);
   await clear(c.env.DB, emailKey);
-  await setSessionCookie(c, row.id, Boolean(row.is_admin));
+  await setSessionCookie(c, row.id, Boolean(row.is_admin), row.session_epoch);
   return c.json({ ok: true, isAdmin: Boolean(row.is_admin) });
 });
 
 app.post("/logout", async (c) => {
+  // Bumping the epoch invalidates every token issued so far, not just this browser's cookie.
+  const userId = c.get("userId");
+  if (userId) await c.env.DB.prepare("UPDATE users SET session_epoch = session_epoch + 1 WHERE id = ?").bind(userId).run();
   deleteCookie(c, SESSION_COOKIE, { path: "/", secure: true });
   return c.json({ ok: true });
 });

@@ -1,6 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import type { AppEnv } from "../types";
 import { HttpError } from "../lib/validate";
+import { getFlags } from "../lib/flags";
 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -15,17 +16,6 @@ export const sameOriginWrites = createMiddleware<AppEnv>(async (c, next) => {
   await next();
 });
 
-async function analyticsEnabled(c: { env: AppEnv["Bindings"] }): Promise<boolean> {
-  try {
-    const row = await c.env.DB.prepare("SELECT length(trim(analytics_script)) AS n FROM site_settings WHERE id = 'main'").first<{
-      n: number | null;
-    }>();
-    return (row?.n ?? 0) > 0;
-  } catch {
-    return false;
-  }
-}
-
 export const securityHeaders = createMiddleware<AppEnv>(async (c, next) => {
   await next();
   const path = new URL(c.req.url).pathname;
@@ -36,7 +26,7 @@ export const securityHeaders = createMiddleware<AppEnv>(async (c, next) => {
   // Cloudflare Web Analytics, when enabled on the zone, injects its own beacon; allow exactly that host.
   let scriptSrc = "script-src 'self' https://static.cloudflareinsights.com";
   let connectSrc = "connect-src 'self' https://cloudflareinsights.com";
-  if (!isApi && wantsHtml && (await analyticsEnabled(c))) {
+  if (!isApi && wantsHtml && (await getFlags(c.env.DB)).analytics) {
     scriptSrc = "script-src 'self' 'unsafe-inline' https:";
     connectSrc = "connect-src 'self' https:";
   }
@@ -67,4 +57,6 @@ export const securityHeaders = createMiddleware<AppEnv>(async (c, next) => {
   }
   // Anything an owner-only or session-aware route returns must never sit in a shared cache.
   if (isApi && !c.res.headers.has("Cache-Control")) c.header("Cache-Control", "no-store");
+  // API data is for this site only. Images stay embeddable elsewhere (feed readers, social cards).
+  if (isApi && !path.startsWith("/api/media/")) c.header("Cross-Origin-Resource-Policy", "same-origin");
 });

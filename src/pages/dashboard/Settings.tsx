@@ -4,6 +4,7 @@ import { BarChart3, Check, Image as ImageIcon, Loader, Mail, Save, Search, UserR
 import { DashboardShell } from "@/components/dashboard-shell";
 import { Field, Icon, PageHead, Section, Select, TextArea, Toggle } from "@/components/dash";
 import { UploadField } from "@/components/upload-field";
+import { BackupSection } from "@/components/backup-section";
 import { api, SOCIAL_PLATFORMS, type SiteSettings } from "@/lib/api";
 
 export default function Settings() {
@@ -89,8 +90,8 @@ export default function Settings() {
             </div>
             <Toggle
               id="s-resize"
-              label="Resize and compress images automatically"
-              hint="Uses Cloudflare Image Resizing; originals stay in R2. Turn it on only after enabling it for your domain (Cloudflare dashboard, your domain, Speed, Optimization). It generally needs a real custom domain. Turned on too early, it breaks every image."
+              label="Use Cloudflare image resizing"
+              hint="Serves every image (covers, logo, avatar, favicon and images inside posts) in the right size and in AVIF or WebP; originals stay in R2. It needs Image Transformations enabled for your domain in the Cloudflare dashboard (Images, Transformations) and a custom domain. If images break after turning it on, turn it off again."
               checked={Boolean(form.image_resizing_enabled)}
               onChange={(v) => set("image_resizing_enabled")(v ? 1 : 0)}
             />
@@ -142,6 +143,8 @@ export default function Settings() {
               hint="Added to every public page. While this is filled in, the site allows the scripts it loads; leave it blank for the strictest security policy."
             />
           </Section>
+
+          <BackupSection />
         </div>
       </div>
     </DashboardShell>

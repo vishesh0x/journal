@@ -26,18 +26,45 @@ function rehypeLazyImages() {
   };
 }
 
-const processor = unified()
-  .use(remarkParse)
-  .use(remarkGfm)
-  .use(remarkRehype)
-  .use(rehypeSanitize)
-  .use(rehypeLazyImages)
-  // Runs after sanitising, so the token classes it adds are kept. Mermaid source stays plain for the diagram renderer.
-  .use(rehypeHighlight, { detect: false, plainText: ["mermaid", "text", "plain"] })
-  .use(rehypeSlug)
-  .use(rehypeStringify);
+const WIDTHS = [480, 768, 1200, 1600];
+const resized = (url: string, w: number) => `/cdn-cgi/image/width=${w},quality=60,format=auto${url}`;
 
-export function renderMarkdown(markdown: string): string {
+// With Cloudflare Image Resizing on, our own uploads get a srcset so phones don't download full-size originals.
+function rehypeResizedImages() {
+  function visit(node: Element | Root) {
+    if ("tagName" in node && node.tagName === "img") {
+      const src = String(node.properties?.src ?? "");
+      if (src.startsWith("/api/media/") && !/\.svg($|\?)/i.test(src)) {
+        node.properties = {
+          ...node.properties,
+          src: resized(src, 1200),
+          srcSet: WIDTHS.map((w) => `${resized(src, w)} ${w}w`).join(", "),
+          sizes: "(min-width: 64rem) 720px, calc(100vw - 3rem)",
+        };
+      }
+    }
+    for (const child of node.children ?? []) if (child.type === "element") visit(child as Element);
+  }
+  return (tree: Root) => visit(tree);
+}
+
+const build = (resizing: boolean) =>
+  unified()
+    .use(remarkParse)
+    .use(remarkGfm)
+    .use(remarkRehype)
+    .use(rehypeSanitize)
+    .use(rehypeLazyImages)
+    .use(resizing ? rehypeResizedImages : () => undefined)
+    // Runs after sanitising, so the token classes it adds are kept. Mermaid source stays plain for the diagram renderer.
+    .use(rehypeHighlight, { detect: false, plainText: ["mermaid", "text", "plain"] })
+    .use(rehypeSlug)
+    .use(rehypeStringify);
+
+const processors = { plain: build(false), resized: build(true) };
+
+export function renderMarkdown(markdown: string, resizing = false): string {
+  const processor = resizing ? processors.resized : processors.plain;
   if (!markdown) return "";
   return String(processor.processSync(markdown));
 }

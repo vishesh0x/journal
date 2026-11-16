@@ -5,6 +5,11 @@
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
 
+  // Cloudflare creates a public preview URL (<version>-journal.<account>.workers.dev) for each
+  // uploaded version. This site has no use for them, and each one would expose an unpublished
+  // build with the same API, so they are switched off.
+  "preview_urls": false,
+
   // Serves the built Vite SPA (dist/) for any request the Worker doesn't
   // explicitly handle (static files first, SPA fallback to index.html).
   "assets": {

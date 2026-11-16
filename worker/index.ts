@@ -4,6 +4,7 @@ import { attachSession } from "./middleware/auth";
 import { securityHeaders, sameOriginWrites } from "./middleware/security";
 import { HttpError } from "./lib/validate";
 import { coverPreload } from "./lib/image";
+import { getCover, getFlags } from "./lib/flags";
 
 import authRoutes from "./routes/auth";
 import postsRoutes from "./routes/posts";
@@ -13,6 +14,7 @@ import settingsRoutes from "./routes/settings";
 import subscribersRoutes from "./routes/subscribers";
 import overviewRoutes from "./routes/overview";
 import mediaRoutes from "./routes/media";
+import backupRoutes from "./routes/backup";
 import feedRoutes from "./routes/feed";
 
 const app = new Hono<AppEnv>();
@@ -46,6 +48,7 @@ app.route("/api/settings", settingsRoutes);
 app.route("/api/subscribers", subscribersRoutes);
 app.route("/api/overview", overviewRoutes);
 app.route("/api/media", mediaRoutes);
+app.route("/api/backup", backupRoutes);
 app.route("/", feedRoutes); // exposes /rss.xml and /sitemap.xml at the site root
 
 const FILE_LIKE = /\.[a-z0-9]{2,6}$/i;
@@ -86,30 +89,49 @@ app.get("/llms.txt", async (c) => {
 
 // The home page and post pages are rendered in the browser, so the worker tells the browser about the
 // cover image up front instead of making it wait for scripts and API calls to find it.
-async function withCoverPreload(c: Context<AppEnv>, cover: string | null, sizes: string, width: number) {
-  const res = await c.env.ASSETS.fetch(c.req.raw);
+async function withCoverPreload(c: Context<AppEnv>, coverPromise: Promise<string | null>, sizes: string, width: number) {
+  // The asset fetch, the cover lookup and the settings lookup run together, not one after another.
+  const [res, cover, flags] = await Promise.all([c.env.ASSETS.fetch(c.req.raw), coverPromise, getFlags(c.env.DB)]);
   if (!cover || !(res.headers.get("content-type") ?? "").includes("text/html")) return res;
-  const settings = await c.env.DB.prepare("SELECT image_resizing_enabled AS r FROM site_settings WHERE id = 'main'").first<{ r: number }>();
-  const tag = coverPreload(cover, Boolean(settings?.r), sizes, width);
+  const tag = coverPreload(cover, flags.resizing, sizes, width);
   if (!tag) return res;
   return new HTMLRewriter()
     .on("head", { element(el) { el.append(tag, { html: true }); } })
     .transform(res);
 }
 
-app.get("/", async (c) => {
-  const row = await c.env.DB.prepare(
-    "SELECT cover_url FROM posts WHERE status = 'published' AND (published_at IS NULL OR published_at <= datetime('now')) ORDER BY featured DESC, published_at DESC LIMIT 1",
-  ).first<{ cover_url: string | null }>();
-  return withCoverPreload(c, row?.cover_url ?? null, "(min-width: 64rem) 58vw, 100vw", 1200);
-});
+app.get("/", (c) =>
+  withCoverPreload(
+    c,
+    getCover(
+      c.env.DB,
+      "home",
+      "SELECT cover_url FROM posts WHERE status = 'published' AND (published_at IS NULL OR published_at <= datetime('now')) ORDER BY featured DESC, published_at DESC LIMIT 1",
+      [],
+    ),
+    "(min-width: 64rem) 58vw, calc(100vw - 3rem)",
+    1200,
+  ),
+);
 
-app.get("/posts/:slug", async (c) => {
-  const row = await c.env.DB.prepare(
-    "SELECT cover_url FROM posts WHERE slug = ? AND status = 'published' AND (published_at IS NULL OR published_at <= datetime('now'))",
-  ).bind(c.req.param("slug")).first<{ cover_url: string | null }>();
-  return withCoverPreload(c, row?.cover_url ?? null, "(min-width: 80rem) 1184px, 100vw", 1600);
-});
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,199}$/;
+
+app.get("/posts/:slug", (c) =>
+  withCoverPreload(
+    c,
+    // Anything that can't be a real slug skips the lookup, so junk URLs never reach the database.
+    !SLUG_RE.test(c.req.param("slug"))
+      ? Promise.resolve(null)
+      : getCover(
+      c.env.DB,
+      `post:${c.req.param("slug")}`,
+      "SELECT cover_url FROM posts WHERE slug = ? AND status = 'published' AND (published_at IS NULL OR published_at <= datetime('now'))",
+      [c.req.param("slug")],
+    ),
+    "(min-width: 80rem) 1184px, calc(100vw - 3rem)",
+    1600,
+  ),
+);
 
 app.notFound(async (c) => {
   const path = new URL(c.req.url).pathname;

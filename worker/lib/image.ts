@@ -1,8 +1,8 @@
 // Mirrors src/lib/image.ts so the HTML preload hint requests exactly what the page will ask for.
-const WIDTHS = [320, 480, 640, 768, 1024, 1280, 1600];
+const WIDTHS = [320, 400, 480, 560, 640, 720, 800, 960, 1120, 1280, 1600];
 
 function resized(url: string, width: number): string {
-  return `/cdn-cgi/image/width=${width},quality=65,format=auto${url}`;
+  return `/cdn-cgi/image/width=${width},quality=60,format=auto${url}`;
 }
 
 const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");

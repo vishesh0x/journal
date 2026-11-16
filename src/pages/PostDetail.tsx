@@ -118,7 +118,7 @@ export default function PostDetail() {
           <img
             src={optimizedImageUrl(post.cover_url, { width: 1600 }, settings?.image_resizing_enabled) ?? undefined}
             srcSet={imageSrcSet(post.cover_url, settings?.image_resizing_enabled)}
-            sizes="(min-width: 80rem) 1184px, 100vw"
+            sizes="(min-width: 80rem) 1184px, calc(100vw - 3rem)"
             width={1600}
             height={900}
             alt=""

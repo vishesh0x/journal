@@ -400,8 +400,8 @@ The frontend was rebuilt with Hallmark (custom run) from the PencilBooth, Fold a
 ## Security notes
 
 - Dependencies: `npm audit` reports 0 vulnerabilities; the deprecated `drizzle-kit` chain was removed (migrations were always plain SQL).
-- Session cookie is `__Host-journal_session` (HttpOnly, Secure, SameSite=Lax), valid 7 days. Writes from another origin are rejected.
-- Login is limited to 8 tries per email and 20 per IP every 15 minutes (so someone can briefly lock the owner out by guessing; it clears after 15 minutes). Sign-ups are limited per IP. Run `npx wrangler d1 migrations apply journal_db --remote` to create the `rate_limits` table (migration 0004).
+- Session cookie is `__Host-journal_session` (HttpOnly, Secure, SameSite=Lax), valid 7 days. Writes from another origin are rejected. Signing out revokes every session token, everywhere (migration 0005); each admin request checks the user and token epoch in the database.
+- Login is limited to 8 tries per email and 20 per IP every 15 minutes (so someone can briefly lock the owner out by guessing; it clears after 15 minutes). Sign-ups are limited per IP. Run `npx wrangler d1 migrations apply journal_db --remote` to apply migrations 0004 (rate limits) and 0005 (session revocation). Everyone is signed out once when you deploy.
 - Optional: set `SETUP_TOKEN` (`npx wrangler secret put SETUP_TOKEN`) so only someone with that code can create the first account.
 - Uploads are checked by their contents, not their declared type, and stored under random names.
 - Settings, post and page fields are validated on the server (URLs must be http or https, text has length limits).
@@ -412,3 +412,29 @@ The frontend was rebuilt with Hallmark (custom run) from the PencilBooth, Fold a
 ## Image library
 
 The dashboard has an **Images** page: upload several files at once, copy an address, or delete a file. Each file shows where it is used (posts, pages, settings), and deleting a file that is in use asks first. Every image field (cover, share image, logo, favicon, portrait, and the editor's insert-image button) opens a picker where you can choose an existing image or upload a new one. The upload keeps the original file name, shown in the library.
+
+## Performance notes
+
+- Diagrams are drawn only when they are within a screen of the viewport, and with the lightweight dagre layout (the 1.5 MB ELK engine is never downloaded).
+- The worker caches the two settings it reads on every page load (analytics on/off, image resizing on/off) and the cover image used for the preload hint for 60 seconds. A change in Settings can take up to a minute to show in the page's headers and preload hint.
+
+## Security audit log (second pass)
+
+Tested live against the running worker: all admin endpoints refuse anonymous calls; forged tokens (alg none, tampered payload, wrong secret, wrong epoch, old cookie name) are rejected; a token stops working after sign-out; writes from another origin, a sibling subdomain or `Sec-Fetch-Site: cross-site` are rejected; SQL probes, path traversal, mass assignment, `__proto__` bodies, oversized bodies and disguised uploads are all refused; 12 SVG attack variants (scripts, event handlers, animate or set tricks, external or data references, CSS escapes, CDATA, trailing HTML) are rejected while a valid SVG is accepted.
+
+Known limits, not fixed: PBKDF2 stays at the Workers cap of 100,000 iterations; the sign-in lockout can briefly lock the owner out; with no `SETUP_TOKEN`, whoever registers first owns the site, so register straight after deploying or set the token first; the optional analytics snippet runs with full page privileges by design; major upgrades (Vite 8, TypeScript 7, plugin-react 6) are left out because they are not security fixes.
+
+## Backup and restore (Settings, last section)
+
+- **Export** downloads one zip: `manifest.json`, `data.json` (settings, topics, posts, post-topic links, pages, subscribers), `media-index.json` and every uploaded image under `media/`. Admin accounts and password hashes are never included. Asking for the zip needs your password again.
+- **Restore** reads the zip in your browser, shows what is inside, and needs a confirmation tick plus your password. It first downloads a safety copy of the current site (on by default), uploads the images (existing images are never deleted), then replaces posts, pages, topics, subscribers and settings. Posts are re-assigned to the current owner.
+- The whole file is validated on the server before anything is changed: unknown columns are dropped, URLs must be http or https, slugs and ids must be unique and well-formed, and images are re-checked like any upload. A bad backup changes nothing.
+- Limits: images up to 15 MB each; the backup is built in your browser's memory, so very large libraries (several hundred MB) may need a desktop browser. Password checks for backup are limited to 10 per 15 minutes.
+
+## Images and Cloudflare
+
+With **Use Cloudflare image resizing** on (Settings, Identity), covers, the logo, the favicon, the portrait, images inside posts and the dashboard thumbnails are served resized and as AVIF or WebP. On small screens, a site with a logo shows the logo alone in the top bar.
+
+## Preview URLs
+
+`wrangler.jsonc` sets `"preview_urls": false`, so Cloudflare no longer exposes a public `*.workers.dev` URL for each uploaded version. Deploy once for it to take effect. The Worker's own `workers.dev` address is separate (`workers_dev`); it is left as it was, so turn that off in the dashboard (Worker, Settings, Domains and Routes) if you only want your custom domain reachable.

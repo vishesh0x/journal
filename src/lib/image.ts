@@ -14,7 +14,7 @@
  */
 export function optimizedImageUrl(
   url: string | null | undefined,
-  options: { width?: number; quality?: number } = {},
+  options: { width?: number; height?: number; fit?: "scale-down" | "contain" | "cover"; quality?: number } = {},
   enabled?: boolean | number,
 ): string | null {
   if (!url) return null;
@@ -25,12 +25,19 @@ export function optimizedImageUrl(
   if (!url.startsWith("/")) return url;
   if (/\.svg($|\?)/i.test(url)) return url;
 
-  const { width = 1600, quality = 65 } = options;
-  const params = [`width=${width}`, `quality=${quality}`, "format=auto"].join(",");
+  const { width, height, fit, quality = 60 } = options;
+  // Width defaults to 1600 unless a height is given (logos are sized by height, any aspect ratio).
+  const params = [
+    ...(width || !height ? [`width=${width ?? 1600}`] : []),
+    ...(height ? [`height=${height}`] : []),
+    ...(fit ? [`fit=${fit}`] : []),
+    `quality=${quality}`,
+    "format=auto",
+  ].join(",");
   return `/cdn-cgi/image/${params}${url}`;
 }
 
-export const COVER_WIDTHS = [320, 480, 640, 768, 1024, 1280, 1600];
+export const COVER_WIDTHS = [320, 400, 480, 560, 640, 720, 800, 960, 1120, 1280, 1600];
 
 /** A responsive srcset for resized images; undefined when the image can't be resized. Keep in sync with worker/lib/image.ts. */
 export function imageSrcSet(url: string | null | undefined, enabled?: boolean | number): string | undefined {

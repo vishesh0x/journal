@@ -58,7 +58,7 @@ const RULES: Record<string, Rule> = {
   image_resizing_enabled: "bool",
 };
 
-function cleanSocialLinks(value: unknown): string {
+export function cleanSocialLinks(value: unknown): string {
   if (value === null || value === undefined) return "{}";
   if (typeof value !== "object" || Array.isArray(value)) throw new HttpError(400, "Social links must be an object.");
   const out: Record<string, string> = {};

@@ -98,7 +98,7 @@ export default function Home() {
                     <img
                       src={optimizedImageUrl(lead.cover_url, { width: 1200 }, settings?.image_resizing_enabled) ?? undefined}
                       srcSet={imageSrcSet(lead.cover_url, settings?.image_resizing_enabled)}
-                      sizes="(min-width: 64rem) 58vw, 100vw"
+                      sizes="(min-width: 64rem) 58vw, calc(100vw - 3rem)"
                       width={1200}
                       height={675}
                       alt=""

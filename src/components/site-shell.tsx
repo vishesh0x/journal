@@ -3,6 +3,7 @@ import { Link, NavLink } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, SOCIAL_PLATFORMS, type SiteSettings, type StaticPageSummary } from "@/lib/api";
 import { decodeEmail } from "@/lib/obfuscate";
+import { optimizedImageUrl } from "@/lib/image";
 import { Globe, Mail, Menu, Rss, Search as SearchIcon, X } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -44,9 +45,9 @@ export function SiteShell({ children }: { children: ReactNode }) {
         link.rel = "icon";
         document.head.appendChild(link);
       }
-      link.href = settings.favicon_url;
+      link.href = optimizedImageUrl(settings.favicon_url, { width: 64 }, settings.image_resizing_enabled) ?? settings.favicon_url;
     }
-  }, [settings?.favicon_url]);
+  }, [settings?.favicon_url, settings?.image_resizing_enabled]);
 
   useEffect(() => {
     if (!settings?.analytics_script) return;
@@ -102,9 +103,21 @@ export function SiteShell({ children }: { children: ReactNode }) {
       <header className="site-header">
         <div className="container">
           <div className="nav">
-            <Link to="/" className="nav-brand wordmark">
-              {settings?.logo_url ? <img src={settings.logo_url} alt="" /> : null}
-              <span>{siteName}</span>
+            <Link to="/" className={`nav-brand wordmark ${settings?.logo_url ? "has-logo" : ""}`} aria-label={siteName}>
+              {settings?.logo_url ? (
+                <img
+                  src={optimizedImageUrl(settings.logo_url, { height: 56, fit: "scale-down" }, settings.image_resizing_enabled) ?? undefined}
+                  srcSet={
+                    settings.image_resizing_enabled && settings.logo_url.startsWith("/")
+                      ? `${optimizedImageUrl(settings.logo_url, { height: 56, fit: "scale-down" }, true)} 1x, ${optimizedImageUrl(settings.logo_url, { height: 112, fit: "scale-down" }, true)} 2x`
+                      : undefined
+                  }
+                  alt=""
+                  width={28}
+                  height={28}
+                />
+              ) : null}
+              <span className="brand-name">{siteName}</span>
             </Link>
 
             <nav aria-label="Main" className="nav-links">

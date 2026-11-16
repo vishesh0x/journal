@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types";
 import { requireAdmin } from "../middleware/auth";
-import { checkSvg } from "../lib/svg";
+import { MAX_IMAGE_BYTES, inspectImage } from "../lib/image-check";
 
 const app = new Hono<AppEnv>();
 
@@ -13,46 +13,20 @@ const app = new Hono<AppEnv>();
 // access / custom domain) and set PUBLIC_MEDIA_BASE_URL to it in
 // wrangler.jsonc. Until that's configured, uploads succeed but the
 // returned URL will 404 — see the "media serving" note in the README.
-const MAX_BYTES = 15 * 1024 * 1024;
-
-// The browser-declared type is not trusted: the file's own first bytes decide what it is.
-function sniff(bytes: Uint8Array): { type: string; ext: string } | null {
-  const at = (i: number, text: string) => text.split("").every((ch, k) => bytes[i + k] === ch.charCodeAt(0));
-  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return { type: "image/jpeg", ext: "jpg" };
-  if (bytes[0] === 0x89 && at(1, "PNG\r\n")) return { type: "image/png", ext: "png" };
-  if (at(0, "GIF87a") || at(0, "GIF89a")) return { type: "image/gif", ext: "gif" };
-  if (at(0, "RIFF") && at(8, "WEBP")) return { type: "image/webp", ext: "webp" };
-  if (at(4, "ftyp") && (at(8, "avif") || at(8, "avis"))) return { type: "image/avif", ext: "avif" };
-  return null;
-}
-
 app.post("/upload", requireAdmin, async (c) => {
   const declared = Number(c.req.header("Content-Length") ?? 0);
-  if (declared > MAX_BYTES + 64 * 1024) return c.json({ error: "File is too large (15MB max)." }, 413);
+  if (declared > MAX_IMAGE_BYTES + 64 * 1024) return c.json({ error: "File is too large (15MB max)." }, 413);
   const form = await c.req.formData();
   const file = form.get("file");
   if (!(file instanceof File)) return c.json({ error: "No file provided." }, 400);
-  if (file.size > MAX_BYTES) return c.json({ error: "File is too large (15MB max)." }, 400);
 
-  const buffer = await file.arrayBuffer();
-  let detected = sniff(new Uint8Array(buffer.slice(0, 16)));
-  let payload: ArrayBuffer | string = buffer;
-  if (!detected) {
-    // Not a raster image: accept it only if it is a plain SVG that passes the allowlist.
-    const svg = checkSvg(new Uint8Array(buffer));
-    if (svg.ok) {
-      detected = { type: "image/svg+xml", ext: "svg" };
-      payload = svg.text;
-    } else if (/^\s*(<\?xml|<svg|\uFEFF)/i.test(new TextDecoder().decode(buffer.slice(0, 64)))) {
-      return c.json({ error: svg.reason }, 400);
-    }
-  }
-  if (!detected) return c.json({ error: "Only JPEG, PNG, WebP, GIF, AVIF or SVG images are allowed." }, 400);
+  const found = inspectImage(await file.arrayBuffer());
+  if (!found.ok) return c.json({ error: found.error }, 400);
 
-  // Random key and an extension taken from the sniffed type, never from the uploaded name.
-  const key = `${crypto.randomUUID()}.${detected.ext}`;
+  // Random key and an extension taken from the inspected type, never from the uploaded name.
+  const key = `${crypto.randomUUID()}.${found.ext}`;
   const name = file.name.replace(/[\u0000-\u001f]/g, "").slice(0, 120);
-  await c.env.MEDIA.put(key, payload, { httpMetadata: { contentType: detected.type }, customMetadata: { name } });
+  await c.env.MEDIA.put(key, found.payload, { httpMetadata: { contentType: found.type }, customMetadata: { name } });
 
   const base = c.env.PUBLIC_MEDIA_BASE_URL;
   const url = base ? `${base.replace(/\/$/, "")}/${key}` : `/api/media/${key}`;

@@ -215,7 +215,11 @@ a.chip:active { transform: translateY(1px); }
 }
 .nav-brand { display: flex; align-items: center; gap: var(--space-sm); min-width: 0; text-decoration: none; font-size: var(--text-xl); }
 .nav-brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-brand img { height: 28px; width: auto; }
+.nav-brand img { height: 28px; width: auto; max-width: 9rem; object-fit: contain; }
+/* With a logo, a long name would only get cut off on a small screen, so the logo stands alone there (the name stays for screen readers). */
+@media (max-width: 40rem) {
+  .nav-brand.has-logo .brand-name { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
 .nav-links { display: none; align-items: center; gap: var(--space-2xs); }
 @media (min-width: 48rem) { .nav-links { display: flex; } .nav-menu-btn { display: none; } }
 .nav-link, .nav-btn {
