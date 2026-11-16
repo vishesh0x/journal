@@ -1,440 +1,228 @@
-# Journal — Cloudflare edition
+# Journal
 
-A personal blogging platform rebuilt to run entirely on Cloudflare's
-serverless stack: **Vite + React** (SPA) served as static assets by a
-**Worker**, a **Hono** API, **D1** (SQLite) for data, and **R2** for media.
+A personal journal and blog that runs entirely on Cloudflare. A React single-page app is served as static assets by one Worker. The same Worker hosts the API (Hono), with D1 (SQLite) for data and R2 for images.
+
+There is one owner, one dashboard and no server to look after.
+
+## What you get
+
+**For readers**
+
+- A home page with a pinned or latest post, an index of the rest, and pagination
+- Post pages with a table of contents, topics, reading time, a cover image and "keep reading"
+- Archive by year, topic pages, search, an About page, Privacy and Terms, and your own pages
+- Light and dark themes, and a newsletter sign-up with one-click unsubscribe
+- RSS (`/rss.xml`), a sitemap (`/sitemap.xml`) and `/llms.txt`
+
+**For you (dashboard at `/dashboard`)**
+
+- **Posts:** a Markdown editor with a toolbar, a live preview that matches the public page, publish dates (a future date schedules the post), pinning, search and sharing details, Ctrl/Cmd+S to save, and a warning before you leave with unsaved edits
+- **Images:** a library with upload, copy address, delete and "where is this used". Every image field lets you choose an existing image or upload a new one
+- **Pages**, **Topics**, **Subscribers** (with CSV export) and **Settings**
+- **Backup and restore:** one zip with everything (see below)
+
+**Writing features**
+
+- Syntax-highlighted code, with Paper Mono's real ligatures (`==`, `!=`, `=>`, `>=`) and a slashed zero
+- Mermaid diagrams in fenced blocks tagged `mermaid`, drawn only when they are about to be seen
+- Tables and task lists (GitHub-flavoured Markdown)
+- Images from uploads, including SVG (see Security)
 
 ## Stack
 
-| Layer      | Choice                          | Why |
-|------------|----------------------------------|-----|
-| Frontend   | React + Vite (client-side SPA)  | Ships as static assets; no SSR runtime needed |
-| Routing    | react-router-dom (client-side)  | Simple, framework-agnostic |
-| API        | Hono, on a single Worker         | Express doesn't run on Workers — no Node `http`/`net`. Hono is edge-native and has similar middleware ergonomics |
-| Database   | Cloudflare D1 (SQLite)           | Replaces Postgres (Workers can't hold raw TCP connections) |
-| Storage    | Cloudflare R2                    | Replaces Supabase Storage |
-| Auth       | Custom, PBKDF2 + signed JWT cookie | bcrypt/native crypto doesn't run on Workers; Web Crypto (`crypto.subtle`) does |
-| Styling    | Tailwind v4 + your existing shadcn/ui components | Pure client-side, unaffected by the backend migration |
+| Layer | Choice |
+| --- | --- |
+| Frontend | React 19, Vite, React Router, TanStack Query, Tailwind CSS 4 |
+| API | Hono on a single Cloudflare Worker |
+| Data | Cloudflare D1 (SQLite) |
+| Media | Cloudflare R2 |
+| Auth | PBKDF2 password hash, signed JWT in an HttpOnly cookie |
+| Markdown | unified, remark and rehype, sanitised before display |
+| Diagrams and icons | Mermaid, lucide-react |
+| Zip | fflate, in the browser |
+| Font | Paper Mono, self-hosted (SIL Open Font License 1.1, in `public/fonts`) |
 
-## Local development
+## Quick start (local)
+
+You need Node 20 or newer. A Cloudflare account is only needed when you deploy.
 
 ```bash
 npm install
 
-# one-time: create local D1 tables
+# 1. a secret for signing sessions, local only (this file is git-ignored)
+echo 'SESSION_SECRET=use-any-long-random-string' > .dev.vars
+
+# 2. create the local database tables
 npm run db:migrate:local
 
-# terminal 1 — the API worker
-npm run dev:worker      # wrangler dev, http://localhost:8787
+# 3. build once so the Worker has assets to serve
+npm run build
 
-# terminal 2 — the frontend (proxies /api to :8787, see vite.config.ts)
-npm run dev              # http://localhost:5173
+# 4. in one terminal: the API and Worker
+npm run dev:worker        # http://localhost:8787
+
+# 5. in another: the frontend with hot reload (proxies /api to the Worker)
+npm run dev               # http://localhost:5173
 ```
 
-Open http://localhost:5173. The first visit to `/auth` lets you create the
-owner account (bootstrap flow — only works once, before any user exists).
+Open http://localhost:5173/auth and create the owner account. That form only works once, while no user exists.
 
-## Deploying
+## Deploy
 
-1. **Create the D1 database and R2 bucket:**
+1. **Create the database and bucket**
+
    ```bash
    npx wrangler d1 create journal_db
    npx wrangler r2 bucket create journal-media
    ```
-   Copy the `database_id` from the first command into `wrangler.jsonc`.
 
-2. **Apply migrations to the remote database:**
+   Put the `database_id` from the first command into `wrangler.jsonc`.
+
+2. **Apply the migrations**
+
    ```bash
    npm run db:migrate:remote
    ```
 
-3. **Set the session secret** (used to sign login cookies):
+3. **Set the secrets**
+
    ```bash
-   npx wrangler secret put SESSION_SECRET
+   npx wrangler secret put SESSION_SECRET     # required: any long random string
+   npx wrangler secret put SETUP_TOKEN        # recommended, see step 5
    ```
 
-4. **(Recommended) Give R2 a public/custom domain** so images load directly
-   from R2 instead of being proxied through the Worker: Cloudflare dashboard
-   → R2 → `journal-media` → Settings → connect a custom domain (e.g.
-   `media.yourdomain.com`), then set that as `PUBLIC_MEDIA_BASE_URL` in
-   `wrangler.jsonc`. Until you do this, uploads still work — they're just
-   served via a `/api/media/:key` Worker route, which is fine for low
-   traffic but skips R2's CDN caching.
+4. **Build and deploy**
 
-5. **Build and deploy:**
    ```bash
    npm run deploy
    ```
 
-## Project layout
+5. **Create your account straight away.** Open `/auth`. Until the first account exists, anyone who finds the page could claim the site. If you set `SETUP_TOKEN`, creating the first account also asks for that code, so only you can.
 
-```
-worker/            Hono API (the Cloudflare Worker)
-  index.ts         entry point / route wiring
-  routes/          auth, posts, tags, pages, settings, subscribers, media, feed
-  middleware/auth.ts  session cookie verification
-  lib/             password hashing, slugs, excerpts
-  db/schema.ts     Drizzle schema (reference/typing; migrations are hand-written SQL)
-migrations/        D1 SQL migrations (wrangler d1 migrations apply)
-src/               the React SPA
-  pages/           public site pages
-  pages/dashboard/ admin dashboard pages
-  components/      shared UI (site shell, post card, editor fields, shadcn/ui)
-wrangler.jsonc     Worker + assets + D1 + R2 bindings
-```
+6. **Optional, recommended:** attach your own domain to the Worker, and turn on Cloudflare Image Transformations for it (see Images).
 
-## Issues found while converting (informational — not fixed beyond what's noted)
+### Updating later
 
-1. **`pages` table was referenced everywhere in the original app's server
-   functions but never created by any migration.** It would have 500'd in
-   production. Added it here with an `about`/`privacy`/`terms` seed.
-2. **Express is incompatible with the Workers runtime** (no Node
-   `http.Server`/`net` sockets). This rewrite uses Hono instead.
-3. **The `postgres` npm client can't run on Workers** (needs raw TCP).
-   Replaced with D1, which required converting `uuid`/`timestamptz`/`jsonb`/
-   enum columns to `text`/`integer`, and moving all access control out of
-   Postgres RLS into Worker middleware (D1 has no RLS).
-4. **bcrypt/argon2 native bindings don't run on Workers.** Replaced with
-   PBKDF2 via the Web Crypto API, which is natively supported.
-5. **Supabase Storage → R2**, with a same-origin Worker route as a fallback
-   for serving images until you attach a custom domain to the bucket.
-6. **TanStack Start's SSR (Nitro/h3) was dropped** in favor of a plain
-   client-rendered SPA, since Workers static-assets + a small API Worker is
-   simpler to reason about and deploy than porting a Node SSR framework.
-   RSS/sitemap are generated dynamically by the Worker instead of at
-   render/build time, so they still update automatically as you publish.
-7. Session state is a **stateless signed JWT cookie**, not a server-side
-   session table — simpler for a single-admin blog, but it means there's no
-   way to revoke a session before it expires (30 days) short of rotating
-   `SESSION_SECRET` (which logs out everyone).
-8. The initial Vite bundle is ~550KB (166KB gzipped) — fine for a personal
-   blog, but if it grows, split the dashboard routes out with
-   `React.lazy()` so visitors to the public site don't download admin code.
-9. **The frontend's visual design was rebuilt to match the original
-   Lovable-generated app** (editorial/magazine style: bold display
-   headings, uppercase tracking-wide labels, grayscale-hover cover images,
-   a featured-post hero, table-of-contents sidebar on posts, a markdown
-   editor with a formatting toolbar + live preview + Google/social share
-   previews). The original app doesn't use shadcn/ui anywhere in its actual
-   pages despite bundling the whole library, so this rewrite drops shadcn/
-   radix entirely and hand-styles with Tailwind instead — smaller bundle,
-   closer visual match. Responsiveness (mobile nav, wrapping dashboard
-   sidebar) was added on top, since the original didn't handle small
-   screens.
-10. While matching the design, found that the `pages` table seed data
-    shouldn't include an "about" row — `/about` is a dedicated route driven
-    by `site_settings.about_markdown`, not a pages-table entry, and the
-    site shell already links to it directly. An earlier version of this
-    migration seeded one anyway, which caused "About" to appear twice in
-    the footer; fixed in `migrations/0000_init.sql`.
-11. **Local dev needs a `SESSION_SECRET`.** Added `.dev.vars` (gitignored,
-    auto-loaded by `wrangler dev`, no `--var` flags needed) with a
-    placeholder value. Production still uses `wrangler secret put
-    SESSION_SECRET` as described above — that's unrelated to `.dev.vars`
-    and won't be overwritten by it.
-12. **Full audit pass** — went through the whole project for bugs and
-    - Heading scale was inconsistent across pages (some jumped straight to
-      `sm:text-7xl` with no `lg` step, Home and post titles used a
-      different scale than Archive/TagDetail/About/404, StaticPage capped
-      out smaller than its siblings). Normalized to two consistent scales:
-      one for short titles, one for long-form text like post titles.
-    - Dashboard border radius, button weight, and input padding were
-      inconsistent between the two full-page editors (`PostEditor`,
-      `PageEditor`, which used `rounded-xl`/`rounded-2xl`) and every other
-      dashboard page (which used `rounded-md`/`rounded-lg`). Unified to one
-      scale dashboard-wide. `PagesList` also had a heavier heading style
-      than its sibling list pages (Posts/Tags/Subscribers/Settings) —
-      normalized.
-    - **Settings page was missing real functionality**, not just fields:
-      accent colour was a text input against a DB default
-      (`oklch(0.55 0.16 35)`) that a native color picker can't parse, so
-      the swatch never worked. Now a real `<input type="color">` with a
-      proper hex default (`#c4633c`).
-      "Default theme" (light/dark/system) existed in the database and was
-      fully wired on the backend but had no UI anywhere, and the theme
-      toggle never consulted it even when set — added the selector and
-      wired it into `ThemeToggle` as the visitor's default (their own
-      toggle choice still always wins).
-      Social links switched from a freeform list to the fixed platform set
-      the design actually uses (twitter, github, linkedin, instagram,
-      mastodon, website, email), stored as an object instead of an array,
-      with the footer updated to match.
-      The entire "Search & sharing" section (default meta title/
-      description/share image, analytics snippet) was missing from the UI
-      even though the backend already supported all of it. Added the
-      section, and — since these fields were stored but never actually
-      consulted anywhere — wired default meta title/description/image into
-      Home, and `meta_title`/`meta_description` into post pages, the About
-      page, and static pages (Privacy/Terms/custom) via a shared
-      `useDocumentMeta` hook. The analytics snippet now actually injects
-      into `<head>` when set.
-13. **Stale media URLs from an earlier default.** An earlier version of
-    `wrangler.jsonc` shipped with `PUBLIC_MEDIA_BASE_URL` set to a
-    placeholder (`https://media.yourdomain.com`) instead of an empty
-    default. Any image uploaded while that placeholder was active got that
-    fake, unreachable domain permanently baked into the database as an
-    absolute URL — fixing the config afterward doesn't retroactively heal
-    already-stored data. Added `migrations/0001_fix_stale_media_urls.sql`,
-    a one-time repair that rewrites every occurrence back to the working
-    same-origin path across `posts.cover_url`, `posts.og_image`,
-    `posts.content_md` (inline Markdown image references), `pages.content_md`,
-    and every image field in `site_settings`. Run it the same way as any
-    other migration (`npm run db:migrate:local` / `db:migrate:remote`) — it's
-    safe to run even if you were never affected, since it only touches rows
-    that actually contain the placeholder domain.
-14. **Post content could scroll horizontally on narrow screens.** Hardened
-    `.prose-journal` (the rendered Markdown) with a blanket
-    `max-width: 100%` on every descendant plus `overflow-wrap: anywhere`,
-    and fixed `<table>` specifically — tables ignore `overflow-x`/`max-width`
-    in their default display mode, so wide tables now scroll within their
-    own box (`display: block; overflow-x: auto`) instead of pushing the
-    whole page wider.
-15. **Mobile table of contents was a cramped wrapped list.** Replaced it
-    with a collapsible `<details>` disclosure below the `lg` breakpoint
-    (closed by default, tap "Contents" to expand), keeping the sticky
-    sidebar version for desktop.
-16. **Images had no alt text.** Post covers, the homepage's featured
-    image, and the author avatar now use meaningful alt text (post title /
-    author name). More importantly, images inserted into post content via
-    the editor's upload button, drag-drop, or paste now get real alt text
-    automatically, derived from the filename — inserted right into the
-    Markdown (`![Alt text](url)`) so it's trivially editable afterward.
-17. **The post editor's live preview made writing cramped.** The
-    write/preview split was always on, permanently halving the width
-    available for actual writing. Added a "Show preview" / "Hide preview"
-    toggle, off by default — the textarea now gets full width (and more
-    height) for focused writing, with the preview available on demand.
-18. **The real cause of "edits/publishes don't show up until a retry."**
-    This affected both posts and pages, and wasn't a caching or logic bug
-    in this app — Cloudflare D1 replicates to multiple read replicas, and
-    a write followed immediately by a read can land on a replica that
-    hasn't caught up yet. That exactly matches "works after a second save
-    or after unpublish/republish" (the retry just gives replication time
-    to catch up). Fixed by adopting D1's Sessions API
-    (`withSession("first-primary")`) in `worker/index.ts`, which forces
-    every request to read from the primary instance, guaranteeing you see
-    your own writes immediately. Note: this API is declared in Cloudflare's
-    published types but isn't implemented by the local `wrangler dev` D1
-    emulator yet, so the middleware feature-detects it
-    (`typeof c.env.DB.withSession === "function"`) and only applies it
-    where it's actually available — it's a no-op locally and active on
-    real Cloudflare deployments.
-19. **Critical: D1/R2 binding names must match exactly.** If you let the
-    `wrangler d1 create` / `wrangler r2 bucket create` CLI prompts
-    auto-add bindings to `wrangler.jsonc` for you, it suggests binding
-    names based on the resource name (e.g. `journal_db`), not the names
-    this code expects (`DB`, `MEDIA`). If those don't match, every
-    database/storage call in the Worker silently fails — which, combined
-    with (20) below, used to show as an endless "Loading…" on the
-    homepage with no visible error. Make sure `wrangler.jsonc` has
-    exactly `"binding": "DB"` under `d1_databases` and
-    `"binding": "MEDIA"` under `r2_buckets`, regardless of what the CLI
-    prompt suggested.
-20. **Pages had no error state — a failed fetch just spun forever.**
-    Home, Archive, Tag, and About pages never checked for query errors,
-    so any API failure (including the binding-name mismatch above) looked
-    exactly like an infinite loading spinner with no indication anything
-    was wrong. Added a shared error state with a retry button across all
-    of them.
-21. **Registration accepted any string as an "email."** Added format
-    validation, matching the newsletter signup form's existing check.
-22. **A near-simultaneous duplicate registration threw an unhandled
-    500.** Now caught and returned as a normal "already has an owner"
-    message. (Note: the underlying TOCTOU race — two different emails
-    registering in the same narrow window before either commits — is a
-    known, separate issue and wasn't addressed here; register your own
-    account immediately after deploying to close that window in practice.)
-23. **Hardening pass**, several smaller issues found in a full security
-    review:
-    - Media uploads accepted any file type and served it back with the
-      client-supplied content-type; now restricted to an image MIME
-      allowlist (JPEG/PNG/WebP/GIF/AVIF — deliberately excluding SVG,
-      which can embed scripts).
-    - `page`/`perPage` query params on the post list weren't validated —
-      a non-numeric value produced `NaN` and broke the query, and
-      `perPage` had no upper bound. Now clamped and defaulted safely.
-    - `posts_per_page` in Settings had no server-side range check (the
-      1–50 limit you see was only an HTML hint). Now clamped on save too.
-    - Creating a tag with an empty name crashed with a generic error
-      instead of a validation message.
-    - Post/page slugs went into RSS/sitemap XML unescaped — not
-      exploitable today since slugs are always slugified first, but
-      hardened defensively anyway.
-    - Added baseline security headers (CSP, `X-Frame-Options: DENY`,
-      `X-Content-Type-Options: nosniff`) to every response. Getting this
-      to actually cover the homepage itself required also setting
-      `run_worker_first: true` on the assets config — by default,
-      requests that match a static file exactly (like `/`) are served by
-      Cloudflare's assets layer *without ever invoking the Worker*, so
-      Worker-level headers silently didn't apply to the page you'd
-      actually load first.
-24. **`noindex` and `canonical_url` were dead fields.** Both existed in
-    the database and were fully editable in the Post/Page editors, but
-    were never rendered anywhere — the checkbox saved, but had zero real
-    effect. Wired `noindex` into an actual `<meta name="robots">` tag (and
-    excluded noindex'd content from the sitemap, which previously listed
-    it despite the contradiction), and `canonical_url` into a real
-    `<link rel="canonical">` tag, via a shared `useDocumentMeta` hook.
+Pull the new code, run `npm install`, run `npm run db:migrate:remote` if `migrations/` has new files, then `npm run deploy`.
 
-## Performance pass
+## Configuration
 
-A broad "make it faster" request came with a long checklist. Several
-items on that list don't actually apply to this architecture — documented
-honestly below rather than faked:
+**`wrangler.jsonc`**
 
-- **"Add a CDN"** — nothing to add. Workers + Assets already serve from
-  Cloudflare's global edge by default. The real, applicable version of
-  this is making API responses cacheable at that edge layer — done, see
-  below.
-- **"Add a load balancer"** — doesn't apply. Workers auto-scale across
-  Cloudflare's network; there's no single origin to balance load across.
-- **"Database connection pooling"** — doesn't apply to D1. It's accessed
-  per-request over Cloudflare's binding API, not a persistent TCP
-  connection like traditional Postgres/MySQL. There's no pool.
-- **"Run a Lighthouse audit"** — this environment has no headless
-  browser, so one couldn't actually be run here. Run it yourself via
-  Chrome DevTools or PageSpeed Insights against the live deployed URL.
+| Key | Purpose |
+| --- | --- |
+| `d1_databases`, `r2_buckets` | The database and bucket bindings (`DB`, `MEDIA`) |
+| `vars.PUBLIC_MEDIA_BASE_URL` | Leave empty to serve images through the Worker at `/api/media/:key`. Set it only after connecting a custom domain to the R2 bucket |
+| `preview_urls` | Set to `false`, so Cloudflare does not publish a public URL for every uploaded version |
+| `compatibility_date` | The runtime version the Worker is built against |
 
-What was actually implemented:
+**Secrets**
 
-25. **Code splitting.** Every dashboard/editor route is now
-    `React.lazy()`-loaded — public visitors no longer download any admin
-    code. Confirmed in the build output: dashboard pages now build as
-    separate chunks (`PostEditor-*.js`, `Settings-*.js`, etc.) instead of
-    being bundled into the main JS file.
-26. **Fixed two real N+1 query patterns.** Saving a post's tags did one
-    sequential `INSERT` per tag; now batched into a single D1 round-trip
-    via `db.batch()`. The dashboard overview stats did 5 separate
-    round-trips; now 1 batched call, with published/draft counts
-    collapsed into one conditional-aggregation query instead of two.
-27. **Added the index that was actually missing**:
-    `post_tags` only had an implicit index on `(post_id, tag_id)` via its
-    composite primary key, which doesn't serve tag-first lookups — the
-    exact query the public tag-filtered post list runs. Without it, that
-    query was a full table scan. Added `post_tags_tag_id_idx`, plus two
-    minor ones (`subscribers.status`, `pages.status`).
-28. **Cache-Control headers on every public GET endpoint** (posts,
-    post-by-slug, archive, search, tags, pages, settings, RSS, sitemap),
-    via a reusable middleware — these now get cached at Cloudflare's edge.
-    Admin routes are explicitly excluded. One honest tradeoff: the
-    post-by-slug route also increments view count as a side effect of the
-    GET, so caching it means view counts become approximate
-    (undercounted during cache hits) — a normal tradeoff for a personal
-    blog's traffic level.
-29. **Image compression, keeping originals in R2 only.** Wired up
-    Cloudflare's URL-based Image Resizing (`/cdn-cgi/image/...`), which
-    transforms images from any same-origin source on the fly — nothing
-    gets duplicated or migrated into Cloudflare Images' own storage.
-    **Off by default** behind a Settings toggle ("Resize & compress
-    images automatically"): Image Resizing needs to be enabled for your
-    zone and generally requires a real custom domain rather than a bare
-    `*.workers.dev` URL, so shipping it on by default risked 404-ing
-    every image for accounts where it isn't available yet. Turn it on
-    once you've confirmed it works.
-30. **Lazy-loading images.** Straightforward for React-rendered images
-    (`loading="lazy"`) — except the likely LCP candidates (post cover,
-    homepage hero), which deliberately get `fetchPriority="high"`
-    instead, since lazy-loading your own LCP element hurts load
-    performance rather than helping it. Images embedded *inside* post
-    content are a different case — they're raw HTML strings from the
-    Markdown pipeline, not React elements, so `loading="lazy"` couldn't
-    be added as a prop. Wrote a small custom rehype plugin instead.
-31. **Debounced editor previews.** Both the post and page editors now
-    debounce the Markdown re-parse by 200ms instead of re-parsing on
-    every keystroke. The textarea itself still updates instantly — only
-    the (more expensive) preview render is delayed.
-32. **Loading skeletons** replace plain "Loading…" text on Home,
-    PostDetail, StaticPage, and About.
-33. **`React.memo`** on `PostCard`, which renders repeatedly across post
-    lists and was re-rendering even when its own data hadn't changed.
-34. **Paginated the one dashboard list that can actually grow large** —
-    Subscribers, now 50 per page with page controls; CSV export still
-    covers everyone regardless of page. Tags and Pages were deliberately
-    left unpaginated: both are naturally small for any real blog (you
-    don't create thousands of topics or static pages by hand), so paging
-    them would add UI complexity for no real benefit.
-35. **Removed unused dependencies**: audited every entry in
-    `package.json` against actual imports — all of them were genuinely
-    in use, nothing to remove. (The bundle was already trimmed
-    significantly in an earlier pass when shadcn/radix were dropped.)
+| Name | Required | Purpose |
+| --- | --- | --- |
+| `SESSION_SECRET` | Yes | Signs login cookies. Changing it signs everyone out |
+| `SETUP_TOKEN` | No | When set, creating the first account requires this code |
 
-## New features
+**Settings page (stored in the database)**
 
-36. **Site search.** Was genuinely missing. Added a `/search` page and
-    a search icon in the header (desktop and mobile) — searches post
-    titles, excerpts, and body content via SQL `LIKE`, debounced 300ms as
-    you type.
-37. **View counts, now actually visible.** `view_count` was tracked in
-    the database this whole time but never shown anywhere. Now displayed
-    per-post in the dashboard's post list.
-38. **Email address protected from scrapers, without hiding it from
-    real visitors.** The public `/api/settings` response now serves your
-    contact email reversed + base64-encoded, so a bot scraping the raw
-    API or HTML for an `@...` pattern won't find one. The frontend
-    decodes it back to a fully normal, clickable `mailto:` link for
-    actual people — same "Email" link in the footer as before, just not
-    harvestable from the raw response. This deters the cheapest and most
-    common scraping method; it isn't cryptographic security, and a
-    scraper specifically targeting this site's code could still reverse
-    it — the same tradeoff every such"contact obfuscation" approach makes.
+Site name, tagline, description, logo, favicon, default theme, posts per page, footer text, your name, bio and portrait, the About page, social links, newsletter text, default search and share details, an optional analytics snippet, and the Cloudflare image resizing switch.
 
-## Design system (rebuild)
+## Images
 
-The frontend was rebuilt with Hallmark (custom run) from the PencilBooth, Fold and Bento references.
+Uploads accept JPEG, PNG, WebP, GIF, AVIF and SVG up to 15 MB. Files are stored in R2 under random names, and the original file name is kept for the library.
 
-- `src/tokens.css`: every colour, face, size and radius (light and `.dark`). Nothing is hard-coded below it.
-- `src/styles.css`: the Hallmark stamp, waivers, and component classes (`.tile`, `.btn`, `.chip`, `.field`, `.row-2`, `.prose-journal`).
-- Type: Paper Mono (OFL) self-hosted from `public/fonts/`, variable weight. Body uses the duospace and narrow-space features (`ss02`, `ss03`), code uses ligatures and the slashed zero (`ss01`, `zero`), lead text uses the single-story a (`cv01`).
-- The accent colour setting was removed: colour comes from the tokens, with one lime action colour and a navy active state.
-- Static pages no longer render their `eyebrow` field (Hallmark bans eyebrows); it is still editable.
-- Local dev needs a `.dev.vars` file with `SESSION_SECRET=...` (not included).
+**Cloudflare image resizing** (Settings, Identity) serves covers, the logo, the favicon, the portrait, images inside posts and the dashboard thumbnails resized, and as AVIF or WebP. Turn it on only after enabling Image Transformations for your domain in the Cloudflare dashboard, which needs a custom domain. If images break after turning it on, turn it off again.
 
-## Content features
+With a logo set, the top bar shows the logo alone on small screens, so a long site name never gets cut off.
 
-- **Mermaid diagrams**: a fenced block tagged `mermaid` renders as a diagram (strict security mode, follows light and dark). The renderer loads only on posts that contain one.
-- **Code**: syntax highlighting, plus Paper Mono's coding ligatures (`==`, `!=`, `=>`, `>=`) and slashed zero inside code.
-- **SVG uploads**: allowed, but only plain SVGs that pass an allowlist (no scripts, event handlers, external links, DOCTYPE or entities). SVGs are shown through `<img>` and served with a sandboxing CSP.
-- **Scheduling and pinning**: the post editor has a publish date (future dates schedule the post) and a pin-to-top option. Pinned posts lead the home page.
-- Ctrl/Cmd+S saves in the editors, and leaving with unsaved edits asks first.
+## Backup and restore
 
-## Security notes
+Settings, last section.
 
-- Dependencies: `npm audit` reports 0 vulnerabilities; the deprecated `drizzle-kit` chain was removed (migrations were always plain SQL).
-- Session cookie is `__Host-journal_session` (HttpOnly, Secure, SameSite=Lax), valid 7 days. Writes from another origin are rejected. Signing out revokes every session token, everywhere (migration 0005); each admin request checks the user and token epoch in the database.
-- Login is limited to 8 tries per email and 20 per IP every 15 minutes (so someone can briefly lock the owner out by guessing; it clears after 15 minutes). Sign-ups are limited per IP. Run `npx wrangler d1 migrations apply journal_db --remote` to apply migrations 0004 (rate limits) and 0005 (session revocation). Everyone is signed out once when you deploy.
-- Optional: set `SETUP_TOKEN` (`npx wrangler secret put SETUP_TOKEN`) so only someone with that code can create the first account.
-- Uploads are checked by their contents, not their declared type, and stored under random names.
-- Settings, post and page fields are validated on the server (URLs must be http or https, text has length limits).
-- The CSP allows scripts from this site only. If you paste an analytics snippet in Settings, the policy relaxes to allow it. Cloudflare Web Analytics is allowed by default.
-- Known trade-off: PBKDF2 is capped at 100,000 iterations by the Workers runtime.
-- `/llms.txt` is generated from your posts and pages. Unknown files and `/.well-known/` paths return a real 404.
+- **Export** downloads one zip: `manifest.json`, `data.json` (settings, topics, posts, the links between them, pages, subscribers), `media-index.json` and every image under `media/`. Admin accounts and password hashes are never included. Your password is asked again, because the file contains subscriber emails. Keep it private.
+- **Restore** reads the zip in your browser and shows what is inside. It needs a confirmation and your password, downloads a safety copy of the current site first (on by default), uploads the images (existing images are never deleted), then replaces posts, pages, topics, subscribers and settings. Posts are assigned to the current owner.
+- The server validates the whole backup before changing anything, so a bad file changes nothing.
+- The zip is built in your browser's memory. Very large libraries (several hundred MB) are better handled on a desktop browser.
 
-## Image library
+## Security
 
-The dashboard has an **Images** page: upload several files at once, copy an address, or delete a file. Each file shows where it is used (posts, pages, settings), and deleting a file that is in use asks first. Every image field (cover, share image, logo, favicon, portrait, and the editor's insert-image button) opens a picker where you can choose an existing image or upload a new one. The upload keeps the original file name, shown in the library.
+- **Sessions:** cookie `__Host-journal_session` (HttpOnly, Secure, SameSite=Lax), valid 7 days. Signing out revokes every session token.
+- **Sign-in limits:** 8 tries per email and 20 per IP every 15 minutes. Wrong guesses can briefly lock the owner out; it clears after 15 minutes.
+- **Same-origin writes:** requests that change data from another origin are rejected.
+- **Headers:** a strict Content Security Policy (scripts from this site only, plus Cloudflare Web Analytics), HSTS, frame blocking, `nosniff`, and Referrer and Permissions policies. The policy relaxes for scripts only while an analytics snippet is saved in Settings.
+- **Validation:** settings, posts, pages and tags are validated on the server (URLs must be http or https, text has length limits).
+- **Uploads:** checked by content, not by declared type. SVG files must pass an allowlist (no scripts, event handlers, external references, DOCTYPE or entities), are shown only through `<img>`, and are served with a sandboxing policy.
+- **Backups:** need your password, and every restored row is rebuilt from known columns and re-validated.
+- **Markdown:** sanitised before it is shown. Mermaid runs in its strict mode.
+- **Password hashing:** PBKDF2-SHA256, capped at 100,000 iterations by the Workers runtime.
+- **Dependencies:** `npm audit` was clean at the last check, and nothing deprecated is installed.
 
 ## Performance notes
 
-- Diagrams are drawn only when they are within a screen of the viewport, and with the lightweight dagre layout (the 1.5 MB ELK engine is never downloaded).
-- The worker caches the two settings it reads on every page load (analytics on/off, image resizing on/off) and the cover image used for the preload hint for 60 seconds. A change in Settings can take up to a minute to show in the page's headers and preload hint.
+- Public pages are code-split, and the sign-in checks run only on dashboard routes.
+- The home page and post pages get a preload hint for the cover image from the Worker, using the same sizes the page will request.
+- The Worker caches two settings and the cover lookup for 60 seconds, so a change in Settings can take up to a minute to reach the page headers and preload hint.
+- Mermaid loads only on posts with a diagram, and only when a diagram is near the screen.
+- The page stylesheet is inlined into the HTML.
 
-## Security audit log (second pass)
+## Design system
 
-Tested live against the running worker: all admin endpoints refuse anonymous calls; forged tokens (alg none, tampered payload, wrong secret, wrong epoch, old cookie name) are rejected; a token stops working after sign-out; writes from another origin, a sibling subdomain or `Sec-Fetch-Site: cross-site` are rejected; SQL probes, path traversal, mass assignment, `__proto__` bodies, oversized bodies and disguised uploads are all refused; 12 SVG attack variants (scripts, event handlers, animate or set tricks, external or data references, CSS escapes, CDATA, trailing HTML) are rejected while a valid SVG is accepted.
+The look comes from three references (a monochrome broadsheet, a navy-on-fog fintech page and an outlined-tile bento grid), built with Hallmark's rules.
 
-Known limits, not fixed: PBKDF2 stays at the Workers cap of 100,000 iterations; the sign-in lockout can briefly lock the owner out; with no `SETUP_TOKEN`, whoever registers first owns the site, so register straight after deploying or set the token first; the optional analytics snippet runs with full page privileges by design; major upgrades (Vite 8, TypeScript 7, plugin-react 6) are left out because they are not security fixes.
+- `src/tokens.css` holds every colour, size, radius and spacing value, for light and dark. Nothing below it uses a hard-coded colour.
+- `src/styles.css` holds the Hallmark stamp, the recorded waivers and the component classes (`.tile`, `.btn`, `.chip`, `.field`, `.row-2`, `.prose-journal`, `.panel`, and so on).
+- Paper Mono is used for body text, interface, code and headlines. There is no accent colour setting: colour comes from the tokens.
 
-## Backup and restore (Settings, last section)
+## Project layout
 
-- **Export** downloads one zip: `manifest.json`, `data.json` (settings, topics, posts, post-topic links, pages, subscribers), `media-index.json` and every uploaded image under `media/`. Admin accounts and password hashes are never included. Asking for the zip needs your password again.
-- **Restore** reads the zip in your browser, shows what is inside, and needs a confirmation tick plus your password. It first downloads a safety copy of the current site (on by default), uploads the images (existing images are never deleted), then replaces posts, pages, topics, subscribers and settings. Posts are re-assigned to the current owner.
-- The whole file is validated on the server before anything is changed: unknown columns are dropped, URLs must be http or https, slugs and ids must be unique and well-formed, and images are re-checked like any upload. A bad backup changes nothing.
-- Limits: images up to 15 MB each; the backup is built in your browser's memory, so very large libraries (several hundred MB) may need a desktop browser. Password checks for backup are limited to 10 per 15 minutes.
+```text
+worker/
+  index.ts              entry point: security headers, route wiring, llms.txt, cover preload
+  routes/               auth, posts, tags, pages, settings, subscribers, media, backup, overview, feed
+  middleware/           auth (session check), security (headers, same-origin), cache
+  lib/                  password, validate, throttle, svg and image checks, flags, content helpers
+  db/schema.ts          typed reference of the tables (migrations are plain SQL)
+migrations/             SQL files applied by wrangler, in order
+src/
+  pages/                public pages; pages/dashboard holds the dashboard screens
+  components/           shells, post cards, media picker, backup section, form pieces
+  lib/                  API client, auth, markdown pipeline, image helpers, backup (zip) logic
+  tokens.css, base.css, styles.css
+public/                 favicon, robots.txt, Paper Mono and its licence
+wrangler.jsonc          Worker, bindings and settings
+```
 
-## Images and Cloudflare
+## Routes
 
-With **Use Cloudflare image resizing** on (Settings, Identity), covers, the logo, the favicon, the portrait, images inside posts and the dashboard thumbnails are served resized and as AVIF or WebP. On small screens, a site with a logo shows the logo alone in the top bar.
+**Pages:** `/`, `/posts/:slug`, `/archive`, `/search`, `/tags/:slug`, `/about`, `/privacy`, `/terms`, `/p/:slug`, `/unsubscribe`, `/auth`, and `/dashboard` with its screens (posts, pages, images, topics, subscribers, settings).
 
-## Preview URLs
+**Machine-readable:** `/rss.xml`, `/sitemap.xml`, `/llms.txt`, `/robots.txt`. Unknown files return a real 404.
 
-`wrangler.jsonc` sets `"preview_urls": false`, so Cloudflare no longer exposes a public `*.workers.dev` URL for each uploaded version. Deploy once for it to take effect. The Worker's own `workers.dev` address is separate (`workers_dev`); it is left as it was, so turn that off in the dashboard (Worker, Settings, Domains and Routes) if you only want your custom domain reachable.
+**API (`/api/...`):** `auth`, `posts`, `tags`, `pages`, `settings`, `subscribers`, `overview`, `media`, `backup`. Everything under an `admin` path, plus uploads, backup and the overview, needs the owner's session.
+
+## Scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Vite dev server with hot reload |
+| `npm run dev:worker` | Local Worker with a local D1 and R2 |
+| `npm run build` | Production build into `dist/` |
+| `npm run typecheck` | TypeScript check of the frontend |
+| `npm run deploy` | Build and deploy with Wrangler |
+| `npm run db:migrate:local` | Apply migrations to the local database |
+| `npm run db:migrate:remote` | Apply migrations to the live database |
+
+To type-check the Worker too, run `npx tsc --noEmit -p tsconfig.worker.json`.
+
+## Troubleshooting
+
+- **Images are broken after turning on resizing.** Turn the switch off in Settings. The zone needs Image Transformations enabled and a custom domain.
+- **Images are broken after setting `PUBLIC_MEDIA_BASE_URL`.** That domain must really be connected to the R2 bucket. Empty it to go back to `/api/media/:key`.
+- **Locked out after wrong passwords.** Wait 15 minutes.
+- **Signed out after a deploy.** Expected after a migration that changes sessions, or if `SESSION_SECRET` changed.
+- **A settings change is slow to show.** Headers and the cover preload hint are cached for up to 60 seconds.
+- **Local sign-in fails with a 500.** `.dev.vars` is missing or has no `SESSION_SECRET`. Restart `npm run dev:worker` after creating it.
+
+## Licence notes
+
+Paper Mono is licensed under the SIL Open Font License 1.1 by The Paper-Mono Project Authors. The licence text is at `public/fonts/PaperMono-OFL.txt`.
