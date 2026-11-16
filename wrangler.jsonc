@@ -23,7 +23,7 @@
     {
       "binding": "DB",
       "database_name": "journal_db",
-      "database_id": "5154a1ba-f9dc-44cf-a7c1-263077e1f227",
+      "database_id": "514a7212-69ad-4d81-9d57-3b1074b6e76e",
       "migrations_dir": "migrations"
     }
   ],
